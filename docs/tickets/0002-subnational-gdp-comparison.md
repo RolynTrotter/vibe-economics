@@ -1,7 +1,24 @@
 # Ticket 0002 — Subnational GDP comparison
 
-**Status:** planned
+**Status:** BUILT (nominal / PPP / per-capita). Median-income basis deferred to
+[ticket 0007](0007-subnational-median-income-basis.md) (needs a live `CENSUS_API_KEY`).
 **Service id:** `subnational_gdp`
+
+## What shipped
+- Backend `app/services/subnational_gdp/` (data.py acquire+compile, pure model.py,
+  router.py, tests) on **BEA Regional** (US state GDP; population derived from
+  personal income ÷ per-capita income) + **World Bank WDI** (country GDP, GDP PPP,
+  population). Shared `app/core/geo.py` (entity ids, parent-nation) added.
+- Three bases: `nominal`, `ppp`, `per_capita` (PPP). PPP for US states uses nominal
+  USD as a proxy (US ≈ PPP base; caveat surfaced).
+- Widget `frontend/src/services/SubnationalGdp.jsx`: one ranked ladder of all 50
+  states + DC among ~210 countries, plus a "your state ≈ which country?" matcher.
+  Switching basis **FLIP-animates** each place to its new rank. US states are a
+  light-blue bloc; countries are coloured by World Bank region.
+- Static snapshot at `frontend/public/data/subnational_gdp.json`; the JS model is a
+  1:1 port of the tested Python model (verified to match).
+- Rebuild: `python -m app.services.subnational_gdp.data build` then
+  `python scripts/export_static_data.py`.
 
 ## Summary
 Compare the economies of subnational regions (e.g. US states) against countries
