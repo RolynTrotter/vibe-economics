@@ -13,11 +13,24 @@ import pytest
 
 from app.services.subnational_gdp import model
 from app.services.subnational_gdp.data import load_entities
+from app.services.subnational_gdp.metros import load_metros
 
 
 @pytest.fixture(scope="module")
 def df():
     return load_entities()
+
+
+@pytest.fixture(scope="module")
+def metros():
+    return load_metros()
+
+
+@pytest.fixture(scope="module")
+def names(df):
+    n = {r.entity_id: r.name for r in df[df.kind == "country"].itertuples()}
+    n["USA"] = "United States"
+    return n
 
 
 def test_coverage(df):
@@ -100,3 +113,45 @@ def test_basis_value_matches_manual_per_capita(df):
     row = df[df["entity_id"] == "US-CA"].iloc[0]
     pc = model.basis_value(df, "per_capita")[df["entity_id"] == "US-CA"].iloc[0]
     assert math.isclose(pc, row["gdp_ppp_usd"] / row["population"], rel_tol=1e-9)
+
+
+# --- metro punch-out / hinterland (ticket 0008) --------------------------------
+def _country_metros(metros, iso3):
+    return metros[metros["country_iso3"] == iso3]
+
+
+def test_remove_largest_and_capital_distinct_for_us(metros):
+    us = _country_metros(metros, "USA")
+    largest = model.select_removed_metros(us, remove_capital=False, remove_largest=True)
+    assert [r["fua_name"] for r in largest] == ["New York (Greater)"]
+    both = model.select_removed_metros(us, remove_capital=True, remove_largest=True)
+    names = {r["fua_name"] for r in both}
+    assert names == {"New York (Greater)", "Washington (Greater)"}  # two distinct metros
+
+
+def test_capital_equals_largest_falls_back_to_second(metros):
+    # UK: London is both capital and largest -> "both" must also drop the next-largest.
+    uk = _country_metros(metros, "GBR")
+    both = model.select_removed_metros(uk, remove_capital=True, remove_largest=True)
+    assert len(both) == 2
+    assert "London" in {r["fua_name"] for r in both}
+    # the second removed metro is the next-largest by GDP share
+    ranked = uk.sort_values("gdp_share_pct", ascending=False)["fua_name"].tolist()
+    assert {r["fua_name"] for r in both} == {ranked[0], ranked[1]}
+
+
+def test_hinterland_us_robust_europe_fragile(metros, names):
+    # The crux of the debate: removing global cities barely dents US per-capita but
+    # sharply cuts Paris-dependent France.
+    whole = model.hinterland_table(metros, "per_capita", False, False, names).set_index("entity_id")
+    both = model.hinterland_table(metros, "per_capita", True, True, names).set_index("entity_id")
+    us_drop = 1 - both.loc["USA", "value"] / whole.loc["USA", "value"]
+    fr_drop = 1 - both.loc["FRA", "value"] / whole.loc["FRA", "value"]
+    assert us_drop < 0.05            # US loses < 5%
+    assert fr_drop > us_drop * 2     # France loses much more
+    assert "Paris" in both.loc["FRA", "removed"]
+
+
+def test_hinterland_unknown_basis_raises(metros):
+    with pytest.raises(ValueError):
+        model.hinterland_table(metros, "bananas", True, False)

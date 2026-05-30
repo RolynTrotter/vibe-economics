@@ -82,6 +82,94 @@ def ranked_table(df: pd.DataFrame, basis: str, kinds: tuple[str, ...] | None = N
     return out[[c for c in cols if c in out.columns]]
 
 
+# --------------------------------------------------------------------------- #
+# Metro punch-out ("hinterland" comparison) — ticket 0008
+# --------------------------------------------------------------------------- #
+def select_removed_metros(
+    country_metros: pd.DataFrame, remove_capital: bool, remove_largest: bool
+) -> list[dict]:
+    """Which FUAs to punch out of one country, given the toggles.
+
+    `country_metros` is that country's metros sorted by GDP share (desc). Rules:
+    - remove_largest  -> the top-GDP metro.
+    - remove_capital  -> the capital metro.
+    - both, and they're the *same* metro (London, Paris, Tokyo) -> also drop the
+      next-largest, so two distinct metros come out.
+    """
+    rows = country_metros.sort_values("gdp_share_pct", ascending=False).to_dict("records")
+    if not rows:
+        return []
+    chosen: dict[str, dict] = {}
+    if remove_largest:
+        chosen[rows[0]["fua_code"]] = rows[0]
+    if remove_capital:
+        cap = next((r for r in rows if r["is_capital"]), None)
+        if cap is not None:
+            chosen[cap["fua_code"]] = cap
+    if remove_capital and remove_largest and len(chosen) < 2:
+        for r in rows:                       # capital == largest: add next-largest
+            if r["fua_code"] not in chosen:
+                chosen[r["fua_code"]] = r
+                break
+    return list(chosen.values())
+
+
+def hinterland_table(
+    metros: pd.DataFrame,
+    basis: str,
+    remove_capital: bool,
+    remove_largest: bool,
+    names: dict[str, str] | None = None,
+) -> pd.DataFrame:
+    """Country-level ladder with each country's selected metro(s) punched out.
+
+    One row per OECD-covered country (incl. the USA as a whole). The carve-out uses
+    OECD's metro GDP-share-of-national for the GDP cut and the derived metro
+    population for the population cut, applied to World Bank national totals.
+
+    Columns: entity_id (ISO3), name, kind ("country"), parent, region, value, rank,
+    year, removed (list of metro names), removed_share (fraction of national GDP).
+    """
+    if basis not in BASES:
+        raise ValueError(f"Unknown basis '{basis}'. Options: {list(BASES)}")
+    names = names or {}
+    rows = []
+    for iso3, g in metros.groupby("country_iso3"):
+        nat_nom = float(g["nat_gdp_nominal_usd"].iloc[0]) if pd.notna(g["nat_gdp_nominal_usd"].iloc[0]) else None
+        nat_ppp = float(g["nat_gdp_ppp_usd"].iloc[0])
+        nat_pop = float(g["nat_population"].iloc[0])
+        removed = select_removed_metros(g, remove_capital, remove_largest)
+        share = sum(r["gdp_share_pct"] for r in removed) / 100.0
+        pop_removed = sum((r["fua_population"] or 0.0) for r in removed)
+        rest_pop = nat_pop - pop_removed
+        if rest_pop <= 0 or share >= 0.999:
+            continue
+        rest_nom = nat_nom * (1 - share) if nat_nom is not None else None
+        rest_ppp = nat_ppp * (1 - share)
+        if basis == "nominal":
+            value = rest_nom
+        elif basis == "ppp":
+            value = rest_ppp
+        else:  # per_capita (PPP)
+            value = rest_ppp / rest_pop
+        if value is None:
+            continue
+        rows.append({
+            "entity_id": iso3,
+            "name": names.get(iso3, iso3),
+            "kind": "country",
+            "parent": iso3,
+            "region": None,
+            "value": value,
+            "year": int(g["year"].iloc[0]),
+            "removed": [r["fua_name"] for r in removed],
+            "removed_share": share,
+        })
+    out = pd.DataFrame(rows).sort_values("value", ascending=False).reset_index(drop=True)
+    out["rank"] = np.arange(1, len(out) + 1)
+    return out
+
+
 def compare(df: pd.DataFrame, entity_ids: list[str], basis: str) -> list[dict]:
     """Values + global ranks for a specific set of entities on `basis`."""
     table = ranked_table(df, basis)

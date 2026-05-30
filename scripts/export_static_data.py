@@ -105,10 +105,59 @@ def export_subnational_gdp() -> None:
             for r in df.itertuples()
         ],
     }
+    payload["hinterland"] = _build_hinterland(df)
+
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     out = OUT_DIR / "subnational_gdp.json"
     out.write_text(json.dumps(payload, separators=(",", ":")))
-    print(f"wrote {len(payload['entities'])} entities -> {out.relative_to(ROOT)}")
+    nh = len(payload["hinterland"]["countries"]) if payload["hinterland"] else 0
+    print(f"wrote {len(payload['entities'])} entities + {nh} hinterland countries -> {out.relative_to(ROOT)}")
+
+
+def _build_hinterland(entities_df: pd.DataFrame) -> dict:
+    """Metro punch-out block (ticket 0008): per OECD country, national totals + its
+    FUAs, so the widget can subtract the capital/largest metro client-side."""
+    metros_path = ROOT / "data" / "processed" / "subnational_metros.parquet"
+    if not metros_path.exists():
+        return {"countries": []}
+    m = pd.read_parquet(metros_path)
+    names = {r.entity_id: r.name for r in entities_df[entities_df.kind == "country"].itertuples()}
+    names["USA"] = "United States"
+    regions = {r.entity_id: r.region for r in entities_df[entities_df.kind == "country"].itertuples()}
+    regions["USA"] = "United States"
+
+    countries = []
+    for iso3, g in m.groupby("country_iso3"):
+        g = g.sort_values("gdp_share_pct", ascending=False)
+        countries.append({
+            "iso3": iso3,
+            "name": names.get(iso3, iso3),
+            "region": regions.get(iso3),
+            "nat_gdp_nominal_usd": None if pd.isna(g.nat_gdp_nominal_usd.iloc[0]) else round(float(g.nat_gdp_nominal_usd.iloc[0])),
+            "nat_gdp_ppp_usd": round(float(g.nat_gdp_ppp_usd.iloc[0])),
+            "nat_population": round(float(g.nat_population.iloc[0])),
+            "year": int(g.year.iloc[0]),
+            "metros": [
+                {
+                    "code": r.fua_code,
+                    "name": r.fua_name,
+                    "is_capital": bool(r.is_capital),
+                    "gdp_share_pct": round(float(r.gdp_share_pct), 3),
+                    "population": None if pd.isna(r.fua_population) else round(float(r.fua_population)),
+                }
+                for r in g.itertuples()
+            ],
+        })
+    countries.sort(key=lambda c: c["nat_gdp_ppp_usd"], reverse=True)
+    return {
+        "source": "OECD Functional Urban Areas (Economy) — GDP share of national value; "
+                  "national totals from World Bank WDI.",
+        "note": "Each country's capital and/or largest metro can be removed; values "
+                "are recomputed on the remaining 'hinterland'. Coverage is OECD/EU "
+                "only. Metro GDP share is applied to both nominal and PPP national "
+                "totals; metro population is OECD-derived (GDP ÷ GDP-per-person).",
+        "countries": countries,
+    }
 
 
 if __name__ == "__main__":

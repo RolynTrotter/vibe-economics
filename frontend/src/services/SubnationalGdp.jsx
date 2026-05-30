@@ -69,6 +69,8 @@ export default function SubnationalGdp() {
   const [query, setQuery] = useState("");
   const [expanded, setExpanded] = useState(false);
   const [matchState, setMatchState] = useState("US-CA");
+  const [removeCapital, setRemoveCapital] = useState(false);
+  const [removeLargest, setRemoveLargest] = useState(false);
 
   useEffect(() => {
     loadDataset("subnational_gdp").then(setData).catch((e) => setError(e.message));
@@ -76,11 +78,16 @@ export default function SubnationalGdp() {
 
   const kinds = KINDS.find((k) => k.key === kindKey)?.kinds ?? null;
   const isPerCapita = basis === "per_capita";
+  const hinterland = (removeCapital || removeLargest) && data?.hinterland?.countries?.length;
 
   const table = useMemo(() => {
     if (!data) return [];
+    if (removeCapital || removeLargest) {
+      if (!data.hinterland?.countries?.length) return [];
+      return m.hinterlandTable(data.hinterland.countries, basis, removeCapital, removeLargest);
+    }
     return m.rankedTable(data.entities, basis, kinds);
-  }, [data, basis, kindKey]);
+  }, [data, basis, kindKey, removeCapital, removeLargest]);
 
   const q = query.trim().toLowerCase();
   const filtered = useMemo(
@@ -119,7 +126,7 @@ export default function SubnationalGdp() {
       }
     });
     prevPos.current = newPos;
-  }, [basis, kindKey, visible.length, q]);
+  }, [basis, kindKey, visible.length, q, removeCapital, removeLargest]);
 
   const basisSpec = m.BASES[basis];
 
@@ -138,18 +145,42 @@ export default function SubnationalGdp() {
           <div className="footnote" style={{ marginTop: 8 }}>{basisSpec?.blurb}</div>
         </div>
 
-        <div className="seg">
-          {KINDS.map((k) => (
-            <button key={k.key} className={kindKey === k.key ? "active" : ""} onClick={() => setKindKey(k.key)}>
-              {k.label}
+        {!hinterland && (
+          <div className="seg">
+            {KINDS.map((k) => (
+              <button key={k.key} className={kindKey === k.key ? "active" : ""} onClick={() => setKindKey(k.key)}>
+                {k.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div>
+          <div className="footnote" style={{ marginBottom: 6 }}>
+            Punch out global cities <span style={{ opacity: 0.7 }}>· OECD countries only</span>
+          </div>
+          <div className="seg">
+            <button className={removeCapital ? "active" : ""} onClick={() => setRemoveCapital((v) => !v)}>
+              {removeCapital ? "✓ " : ""}Capital metro
             </button>
-          ))}
+            <button className={removeLargest ? "active" : ""} onClick={() => setRemoveLargest((v) => !v)}>
+              {removeLargest ? "✓ " : ""}Largest metro
+            </button>
+          </div>
+          {hinterland && (
+            <div className="footnote" style={{ marginTop: 8 }}>
+              Hinterland view: each economy minus its{" "}
+              {removeCapital && removeLargest ? "capital and largest" : removeCapital ? "capital" : "largest"}{" "}
+              metro, recomputed on what’s left. Non-OECD countries and US states are
+              hidden here.
+            </div>
+          )}
         </div>
 
         <input
           className="search"
           type="search"
-          placeholder="Find a state or country…"
+          placeholder={hinterland ? "Find a country…" : "Find a state or country…"}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
@@ -160,7 +191,8 @@ export default function SubnationalGdp() {
 
       {data && (
         <>
-          {/* "Your state ≈ country" matcher */}
+          {/* "Your state ≈ country" matcher (whole-economy view only) */}
+          {!hinterland && (
           <div className="panel">
             <div className="chart-title">Your state ≈ which country?</div>
             <select className="search" value={matchState} onChange={(e) => setMatchState(e.target.value)}>
@@ -196,12 +228,15 @@ export default function SubnationalGdp() {
               </div>
             )}
           </div>
+          )}
 
           {/* The animated ladder */}
           <div className="panel">
             <div className="chart-title">
-              {basisSpec?.label} — world ranking ({filtered.length}
-              {q ? " matches" : " places"})
+              {basisSpec?.label}
+              {hinterland ? " — hinterlands (metros removed)" : " — world ranking"} (
+              {filtered.length}
+              {q ? " matches" : hinterland ? " countries" : " places"})
             </div>
             <div className="ladder">
               {visible.map((e) => {
@@ -215,10 +250,15 @@ export default function SubnationalGdp() {
                       if (el) rowRefs.current.set(e.id, el);
                       else rowRefs.current.delete(e.id);
                     }}
-                    className={`lrow${e.kind === "state" ? " is-state" : ""}${hit ? " hit" : ""}`}
+                    className={`lrow${e.kind === "state" ? " is-state" : ""}${e.id === "USA" ? " is-state" : ""}${hit ? " hit" : ""}`}
                   >
                     <span className="lrank">{e.rank}</span>
-                    <span className="lname">{e.name}</span>
+                    <span className="lname">
+                      {e.name}
+                      {e.removed?.length ? (
+                        <span className="lremoved"> − {e.removed.join(", ")}</span>
+                      ) : null}
+                    </span>
                     <span className="lbar-wrap">
                       <span className="lbar" style={{ width: `${w}%`, background: color }} />
                     </span>
@@ -236,12 +276,13 @@ export default function SubnationalGdp() {
               {LEGEND.map(([label, c]) => (
                 <span key={label} className="legend-item">
                   <span className="swatch" style={{ background: c }} />
-                  {label}
+                  {label === "US states" && hinterland ? "United States" : label}
                 </span>
               ))}
             </div>
             <div className="footnote" style={{ marginTop: 6 }}>
               Bars are √-scaled for legibility; the figure on the right is the actual value.
+              {hinterland ? ` ${data.hinterland.note}` : ""}
             </div>
           </div>
 

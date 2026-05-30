@@ -57,6 +57,57 @@ export function rankedTable(entities, basis, kinds = null) {
   return rows;
 }
 
+// --- Metro punch-out ("hinterland" comparison) — mirrors model.py (ticket 0008) ---
+
+// Which FUAs to punch out of one country, given the toggles. `metros` is that
+// country's metros (sorted by GDP share, desc). If both toggles are on and the
+// capital IS the largest (London, Paris, Tokyo), also drop the next-largest so two
+// distinct metros come out.
+export function selectRemovedMetros(metros, removeCapital, removeLargest) {
+  const rows = [...metros].sort((a, b) => b.gdp_share_pct - a.gdp_share_pct);
+  if (!rows.length) return [];
+  const chosen = new Map();
+  if (removeLargest) chosen.set(rows[0].code, rows[0]);
+  if (removeCapital) {
+    const cap = rows.find((r) => r.is_capital);
+    if (cap) chosen.set(cap.code, cap);
+  }
+  if (removeCapital && removeLargest && chosen.size < 2) {
+    for (const r of rows) if (!chosen.has(r.code)) { chosen.set(r.code, r); break; }
+  }
+  return [...chosen.values()];
+}
+
+// Country-level ladder with each country's selected metro(s) punched out.
+// `countries` is the hinterland block from the snapshot.
+export function hinterlandTable(countries, basis, removeCapital, removeLargest) {
+  const spec = BASES[basis];
+  if (!spec) throw new Error(`Unknown basis '${basis}'`);
+  const rows = [];
+  for (const c of countries) {
+    const removed = selectRemovedMetros(c.metros, removeCapital, removeLargest);
+    const share = removed.reduce((s, r) => s + r.gdp_share_pct, 0) / 100;
+    const popRemoved = removed.reduce((s, r) => s + (r.population || 0), 0);
+    const restPop = c.nat_population - popRemoved;
+    if (restPop <= 0 || share >= 0.999) continue;
+    const restNom = c.nat_gdp_nominal_usd != null ? c.nat_gdp_nominal_usd * (1 - share) : null;
+    const restPpp = c.nat_gdp_ppp_usd * (1 - share);
+    let value;
+    if (basis === "nominal") value = restNom;
+    else if (basis === "ppp") value = restPpp;
+    else value = restPpp / restPop;
+    if (value == null) continue;
+    rows.push({
+      id: c.iso3, entity_id: c.iso3, name: c.name, kind: "country",
+      parent: c.iso3, region: c.region, value, year: c.year,
+      removed: removed.map((r) => r.name), removed_share: share,
+    });
+  }
+  rows.sort((a, b) => b.value - a.value);
+  rows.forEach((r, i) => (r.rank = i + 1));
+  return rows;
+}
+
 // For one entity, the `among`-kind neighbours nearest in basis value.
 export function nearest(entities, entityId, basis, n = 3, among = "country") {
   const table = rankedTable(entities, basis);

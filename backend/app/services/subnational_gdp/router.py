@@ -76,6 +76,34 @@ def compare(
     return {"basis": basis, "entities": ids, "rows": rows}
 
 
+@router.get("/hinterland")
+def hinterland(
+    basis: str = Query("per_capita"),
+    remove_capital: bool = Query(False),
+    remove_largest: bool = Query(False),
+) -> dict:
+    """Country-level ladder (OECD coverage) with each country's capital and/or
+    largest metro punched out and the remainder recomputed — the 'hinterland' view."""
+    from .metros import load_metros
+
+    df = load_entities()
+    names = {r.entity_id: r.name for r in df[df["kind"] == "country"].itertuples()}
+    names["USA"] = "United States"
+    try:
+        table = model.hinterland_table(
+            load_metros(), basis, remove_capital, remove_largest, names
+        )
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    return {
+        "basis": basis,
+        "remove_capital": remove_capital,
+        "remove_largest": remove_largest,
+        "n": len(table),
+        "rows": table.to_dict(orient="records"),
+    }
+
+
 @router.get("/rank")
 def rank(
     entity: str = Query(..., description="entity id, e.g. US-VA"),
