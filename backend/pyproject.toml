@@ -1,0 +1,14 @@
+[project]
+name = "vibe-economics-backend"
+version = "0.1.0"
+description = "FastAPI services for vibe-economics"
+requires-python = ">=3.11"
+dynamic = ["dependencies"]
+
+[tool.pytest.ini_options]
+testpaths = ["app"]
+pythonpath = ["."]
+addopts = "-q"
+
+[tool.setuptools]
+packages = ["app"]

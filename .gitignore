@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Node / frontend
+node_modules/
+frontend/dist/
+*.local
+
+# Data: keep the catalog + processed tidy artifacts, ignore bulky raw downloads
+data/raw/*
+!data/raw/.gitkeep
+# Processed parquet/csv ARE committed so services run offline & results are reproducible.
+# (If a processed file gets large, gitignore it explicitly and document the rebuild command.)
+
+# OS / editor
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# Secrets / API keys
+.env
+*.env
+secrets.yaml

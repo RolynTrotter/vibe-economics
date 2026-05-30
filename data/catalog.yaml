@@ -1,0 +1,161 @@
+# Dataset registry — the source of truth for every dataset in the repo.
+#
+# Each entry is keyed by a stable snake_case `id`. The CLI (`app.cli acquire/compile`)
+# and the service data loaders read this file. When you add a dataset via the
+# acquire-dataset / compile-dataset skills, append an entry here.
+#
+# Fields:
+#   title       human-readable name
+#   source      organisation that publishes it
+#   homepage    landing page for humans
+#   url         direct download URL of the raw file (or API base)
+#   license     license / terms summary (note any redistribution limits)
+#   api_key     env var name if a key is required, else null
+#   raw         path under data/raw/ where acquire writes the source file
+#   processed   path under data/processed/ where compile writes tidy output
+#   compiler    dotted path to the compile function (module:function)
+#   notes       gotchas, units, coverage
+
+datasets:
+  shiller_returns:
+    title: "Shiller U.S. Stock Market Data (S&P 500 prices, dividends, earnings, CPI, 10yr rate)"
+    source: "Robert J. Shiller, Yale University (CSV mirror: github.com/datasets/s-and-p-500)"
+    homepage: "http://www.econ.yale.edu/~shiller/data.htm"
+    url: "https://raw.githubusercontent.com/datasets/s-and-p-500/main/data/data.csv"
+    license: "Free for academic/personal use; cite Shiller. Not for resale."
+    api_key: null
+    raw: "shiller_returns/sp500.csv"
+    processed: "shiller_returns.parquet"
+    compiler: "app.services.safe_withdrawal.data:compile_shiller"
+    notes: >
+      Monthly since 1871 (Date, SP500 price, Dividend, Earnings, CPI, Long Interest
+      Rate/GS10). We derive annual nominal total returns for stocks (price +
+      reinvested dividends) and a 10yr-Treasury par-bond proxy, plus annual CPI
+      inflation. Sourced from the GitHub CSV mirror because Yale/Shiller is not
+      reachable under restrictive network policies; the data is identical. Powers
+      the safe-withdrawal reference service.
+
+  # --- Catalogued sources for upcoming services (acquire/compile not yet wired) ---
+
+  damodaran_histret:
+    title: "Historical Returns on Stocks, Bonds and Bills - United States"
+    source: "Aswath Damodaran, NYU Stern"
+    homepage: "https://pages.stern.nyu.edu/~adamodar/New_Home_Page/datacurrent.html"
+    url: "https://pages.stern.nyu.edu/~adamodar/pc/datasets/histretSP.xls"
+    license: "Free for educational use."
+    api_key: null
+    raw: "damodaran_histret/histretSP.xls"
+    processed: null
+    compiler: null
+    notes: "Alternative annual returns series (stocks/T.bonds/T.bills/inflation) back to 1928. Backup for shiller_returns."
+
+  worldbank_indicators:
+    title: "World Bank World Development Indicators (GDP, PPP, population, etc.)"
+    source: "The World Bank"
+    homepage: "https://data.worldbank.org/"
+    url: "https://api.worldbank.org/v2/country/{country}/indicator/{indicator}?format=json&per_page=20000"
+    license: "CC BY 4.0"
+    api_key: null
+    raw: "worldbank/{indicator}.json"
+    processed: null
+    compiler: null
+    notes: "Key-free REST API. Indicators e.g. NY.GDP.MKTP.PP.CD (GDP PPP), SP.POP.TOTL. Used by subnational-GDP & cost-of-living services."
+
+  imf_datamapper:
+    title: "IMF DataMapper (WEO indicators)"
+    source: "International Monetary Fund"
+    homepage: "https://www.imf.org/external/datamapper/"
+    url: "https://www.imf.org/external/datamapper/api/v1/{indicator}"
+    license: "IMF terms; attribution required."
+    api_key: null
+    raw: "imf/{indicator}.json"
+    processed: null
+    compiler: null
+    notes: "Key-free. NGDPD (GDP USD), PPPGDP (GDP PPP), etc."
+
+  bea_regional:
+    title: "BEA Regional Economic Accounts (US state/county GDP & income)"
+    source: "U.S. Bureau of Economic Analysis"
+    homepage: "https://apps.bea.gov/regional/"
+    url: "https://apps.bea.gov/api/data/?UserID={api_key}&method=GetData&datasetname=Regional"
+    license: "U.S. Government work, public domain."
+    api_key: "BEA_API_KEY"
+    raw: "bea/{table}.json"
+    processed: null
+    compiler: null
+    notes: "Requires free API key. State/county GDP, personal income. Used by subnational-GDP service."
+
+  eurostat:
+    title: "Eurostat statistics (regional GDP, GDP per capita PPS, etc.)"
+    source: "Eurostat"
+    homepage: "https://ec.europa.eu/eurostat/web/main/data/database"
+    url: "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/{dataset}?format=JSON"
+    license: "Eurostat reuse policy (free reuse with attribution)."
+    api_key: null
+    raw: "eurostat/{dataset}.json"
+    processed: null
+    compiler: null
+    notes: "Key-free JSON-stat API. nama_10r_2gdp = regional GDP. Used by subnational-GDP service."
+
+  fed_scf:
+    title: "Federal Reserve Survey of Consumer Finances (wealth & income distribution)"
+    source: "U.S. Federal Reserve Board"
+    homepage: "https://www.federalreserve.gov/econres/scfindex.htm"
+    url: "https://www.federalreserve.gov/econres/files/scf2022_tables_public_real_historical.xlsx"
+    license: "U.S. Government work, public domain."
+    api_key: null
+    raw: "fed_scf/scf_historical.xlsx"
+    processed: null
+    compiler: null
+    notes: "Also see DFA (Distributional Financial Accounts) for quarterly wealth by percentile. Used by Fed wealth/income service."
+
+  fed_dfa:
+    title: "Federal Reserve Distributional Financial Accounts (wealth by percentile, quarterly)"
+    source: "U.S. Federal Reserve Board"
+    homepage: "https://www.federalreserve.gov/releases/z1/dataviz/dfa/"
+    url: "https://www.federalreserve.gov/releases/z1/dataviz/dfa/distribute/table/dfa-income-levels.csv"
+    license: "U.S. Government work, public domain."
+    api_key: null
+    raw: "fed_dfa/dfa.csv"
+    processed: null
+    compiler: null
+    notes: "CSV download, no key. Wealth/income shares by percentile over time."
+
+  fred:
+    title: "FRED (Federal Reserve Economic Data)"
+    source: "Federal Reserve Bank of St. Louis"
+    homepage: "https://fred.stlouisfed.org/"
+    url: "https://api.stlouisfed.org/fred/series/observations?series_id={series}&api_key={api_key}&file_type=json"
+    license: "Varies by series; FRED terms of use."
+    api_key: "FRED_API_KEY"
+    raw: "fred/{series}.json"
+    processed: null
+    compiler: null
+    notes: "Requires free API key. Huge breadth of macro series. General-purpose backup source."
+
+  numbeo_cost_of_living:
+    title: "Numbeo Cost of Living (city-level prices: rent, groceries, etc.)"
+    source: "Numbeo"
+    homepage: "https://www.numbeo.com/cost-of-living/"
+    url: "https://www.numbeo.com/api/"
+    license: "PROPRIETARY — API requires paid key; scraping restricted by ToS. Handle carefully."
+    api_key: "NUMBEO_API_KEY"
+    raw: "numbeo/{city}.json"
+    processed: null
+    compiler: null
+    notes: >
+      Flagship cost-of-living service's richest city-level source but license-gray.
+      Prefer official stats (BLS, OECD, Eurostat, national stat offices) where possible;
+      use Numbeo only with a valid key and within its terms. See ticket 0005.
+
+  oecd:
+    title: "OECD statistics (price levels, PPP, regional wellbeing)"
+    source: "OECD"
+    homepage: "https://data.oecd.org/"
+    url: "https://sdmx.oecd.org/public/rest/data/{dataflow}/{key}?format=jsondata"
+    license: "OECD terms; free reuse with attribution."
+    api_key: null
+    raw: "oecd/{dataflow}.json"
+    processed: null
+    compiler: null
+    notes: "Key-free SDMX API. Comparative price levels, PPPs. License-clean alternative for cost-of-living."

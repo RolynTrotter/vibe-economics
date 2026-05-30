@@ -1,0 +1,98 @@
+:root {
+  --bg: #0b1020;
+  --panel: #141b32;
+  --panel-2: #1b2340;
+  --text: #e6ecff;
+  --muted: #9fb0d8;
+  --accent: #64d2ff;
+  --accent-2: #ffd166;
+  --danger: #ff6b6b;
+  --ok: #5ddc9a;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Mobile-first: single column, comfortable tap targets. */
+.app {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 16px 16px calc(32px + env(safe-area-inset-bottom));
+}
+
+.app-header h1 { font-size: 1.4rem; margin: 8px 0 2px; }
+.app-header p { color: var(--muted); margin: 0 0 16px; font-size: 0.9rem; }
+
+.nav {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 12px;
+}
+.nav button {
+  flex: 0 0 auto;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: 0.9rem;
+  min-height: 40px;
+}
+.nav button.active { border-color: var(--accent); color: var(--accent); }
+.nav button:disabled { opacity: 0.45; }
+
+.panel {
+  background: var(--panel);
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.controls { display: flex; flex-direction: column; gap: 14px; }
+
+.seg { display: flex; gap: 6px; flex-wrap: wrap; }
+.seg button {
+  flex: 1 1 auto;
+  min-height: 44px;
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid transparent;
+  border-radius: 12px;
+  font-size: 0.9rem;
+}
+.seg button.active { border-color: var(--accent); color: var(--accent); }
+
+label.field { display: block; font-size: 0.85rem; color: var(--muted); }
+label.field .val { color: var(--text); font-weight: 600; float: right; }
+
+input[type="range"] { width: 100%; height: 44px; accent-color: var(--accent); }
+
+.cards { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.card {
+  background: var(--panel-2);
+  border-radius: 14px;
+  padding: 14px;
+}
+.card .label { color: var(--muted); font-size: 0.78rem; }
+.card .value { font-size: 1.5rem; font-weight: 700; margin-top: 4px; }
+.card .sub { color: var(--muted); font-size: 0.75rem; margin-top: 2px; }
+.card.good .value { color: var(--ok); }
+.card.warn .value { color: var(--accent-2); }
+.card.bad .value { color: var(--danger); }
+
+.chart-wrap { width: 100%; }
+.chart-title { font-size: 0.9rem; color: var(--muted); margin: 4px 0 8px; }
+
+.footnote { color: var(--muted); font-size: 0.75rem; line-height: 1.5; }
+.error { color: var(--danger); }
+.loading { color: var(--muted); }
+a { color: var(--accent); }
