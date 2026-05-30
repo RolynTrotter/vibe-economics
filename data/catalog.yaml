@@ -135,13 +135,19 @@ datasets:
     title: "Federal Reserve Distributional Financial Accounts (wealth by percentile, quarterly)"
     source: "U.S. Federal Reserve Board"
     homepage: "https://www.federalreserve.gov/releases/z1/dataviz/dfa/"
-    url: "https://www.federalreserve.gov/releases/z1/dataviz/dfa/distribute/table/dfa-income-levels.csv"
+    url: "https://www.federalreserve.gov/releases/z1/dataviz/download/zips/dfa.zip"
     license: "U.S. Government work, public domain."
     api_key: null
-    raw: "fed_dfa/dfa.csv"
+    raw: "fed_dfa/dfa.zip"
     processed: null
     compiler: null
-    notes: "CSV download, no key. Wealth/income shares by percentile over time."
+    notes: >
+      No key. The single-CSV distribute endpoint was retired; the Fed now ships a
+      bundled zip containing dfa-<group>-levels.csv / dfa-<group>-shares.csv for
+      income, networth, age, race, education and generation, plus
+      dfa-data-definitions.txt. Compiler should unzip and read dfa-networth-shares.csv
+      (wealth shares by percentile) and dfa-income-* as needed. Used by Fed
+      wealth/income service.
 
   fred:
     title: "FRED (Federal Reserve Economic Data)"
@@ -181,3 +187,69 @@ datasets:
     processed: null
     compiler: null
     notes: "Key-free SDMX API. Comparative price levels, PPPs. License-clean alternative for cost-of-living."
+
+  # --- Ticket 0006 §C: keyed/freemium sources staged for upcoming services ---
+  # Hosts api.bls.gov and api.census.gov are in the egress allowlist; data.nasdaq.com
+  # and www.alphavantage.co are NOT allowlisted yet. All four are placeholders:
+  # acquire/compile not yet wired, and the generic CLI does not substitute the
+  # {…} URL template params — service-specific acquire logic will. The api_key field
+  # is the exact env-var name DatasetSpec.resolved_api_key() will read.
+
+  bls:
+    title: "U.S. Bureau of Labor Statistics — Public Data API (CPI, employment, wages)"
+    source: "U.S. Bureau of Labor Statistics"
+    homepage: "https://www.bls.gov/developers/"
+    url: "https://api.bls.gov/publicAPI/v2/timeseries/data/"
+    license: "U.S. Government work, public domain."
+    api_key: "BLS_API_KEY"
+    raw: "bls/{series}.json"
+    processed: null
+    compiler: null
+    notes: >
+      POST API (JSON body with seriesid list + registrationkey). Registered v2 key:
+      500 queries/day, up to 50 series/query; v1 unregistered is only 25/day. CPI
+      detail, employment, wages. acquire/compile not yet wired.
+
+  census:
+    title: "U.S. Census Bureau APIs (ACS demographics, income, housing)"
+    source: "U.S. Census Bureau"
+    homepage: "https://www.census.gov/data/developers.html"
+    url: "https://api.census.gov/data/{year}/acs/acs5?get={variables}&for={geography}&key={api_key}"
+    license: "U.S. Government work, public domain."
+    api_key: "CENSUS_API_KEY"
+    raw: "census/{dataset}.json"
+    processed: null
+    compiler: null
+    notes: >
+      ~500 queries/day per key; prefer wide queries over many narrow ones. ACS 5-year
+      for demographics, income and housing. acquire/compile not yet wired.
+
+  nasdaq_data_link:
+    title: "Nasdaq Data Link (Quandl) — financial & commodity series"
+    source: "Nasdaq Data Link (formerly Quandl)"
+    homepage: "https://docs.data.nasdaq.com/"
+    url: "https://data.nasdaq.com/api/v3/datasets/{database}/{dataset}.json?api_key={api_key}"
+    license: "Varies by database/product; check each product's terms before redistribution."
+    api_key: "NASDAQ_DATA_LINK_API_KEY"
+    raw: "nasdaq_data_link/{database}_{dataset}.json"
+    processed: null
+    compiler: null
+    notes: >
+      ~50 calls/day anonymous; higher with a free key. Broad financial/commodity
+      series. Host data.nasdaq.com not yet in egress allowlist. acquire/compile not
+      yet wired.
+
+  alpha_vantage:
+    title: "Alpha Vantage — equities & FX time series"
+    source: "Alpha Vantage"
+    homepage: "https://www.alphavantage.co/documentation/"
+    url: "https://www.alphavantage.co/query?function={function}&symbol={symbol}&apikey={api_key}"
+    license: "Free tier for personal/non-commercial use; see Alpha Vantage terms."
+    api_key: "ALPHAVANTAGE_API_KEY"
+    raw: "alpha_vantage/{symbol}.json"
+    processed: null
+    compiler: null
+    notes: >
+      Very tight free tier — 25 requests/day, 5/min; cache hard. Use only if a use
+      case truly needs it. Host www.alphavantage.co not yet in egress allowlist.
+      acquire/compile not yet wired.
