@@ -19,12 +19,12 @@ ROOT = Path(__file__).resolve().parents[1]
 OUT_DIR = ROOT / "frontend" / "public" / "data"
 
 
-def export_shiller_returns() -> None:
-    df = pd.read_parquet(ROOT / "data" / "processed" / "shiller_returns.parquet")
+def export_jst_returns() -> None:
+    df = pd.read_parquet(ROOT / "data" / "processed" / "jst_returns.parquet")
     df = df.sort_values("year")
     payload = {
-        "dataset": "shiller_returns",
-        "source": "Robert J. Shiller, Yale (CSV mirror datasets/s-and-p-500)",
+        "dataset": "jst_returns",
+        "source": "Jordà-Schularick-Taylor Macrohistory (Rate of Return on Everything, 1870-2015)",
         "first_year": int(df.year.min()),
         "last_year": int(df.year.max()),
         "n_years": int(len(df)),
@@ -33,23 +33,29 @@ def export_shiller_returns() -> None:
             "SWR = upper bound on the 4% rule: max constant real withdrawal that "
             "depletes the portfolio to exactly $0 at the horizon."
         ),
-        "notes": "Bond = 10yr Treasury par-bond proxy. 3-fund intl equity proxied by US equity.",
-        "columns": ["year", "stock_return", "bond_return", "inflation"],
+        "notes": (
+            "US & bond from JST USA series; intl = GDP-weighted developed-ex-US "
+            "equity converted to USD. Three-fund = 60/40 equity/bond with equity "
+            "split 60/40 US/intl, so it differs from 60-40 only by international "
+            "diversification."
+        ),
+        "columns": ["year", "us_stock", "intl_stock", "bond", "inflation"],
         "rows": [
             [
                 int(r.year),
-                round(float(r.stock_return), 6),
-                round(float(r.bond_return), 6),
+                round(float(r.us_stock), 6),
+                round(float(r.intl_stock), 6),
+                round(float(r.bond), 6),
                 round(float(r.inflation), 6),
             ]
             for r in df.itertuples()
         ],
     }
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    out = OUT_DIR / "shiller_returns.json"
+    out = OUT_DIR / "jst_returns.json"
     out.write_text(json.dumps(payload, separators=(",", ":")))
     print(f"wrote {len(payload['rows'])} rows -> {out.relative_to(ROOT)}")
 
 
 if __name__ == "__main__":
-    export_shiller_returns()
+    export_jst_returns()

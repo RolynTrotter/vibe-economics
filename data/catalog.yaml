@@ -17,6 +17,28 @@
 #   notes       gotchas, units, coverage
 
 datasets:
+  jst_returns:
+    title: "Jordà-Schularick-Taylor Macrohistory — annual asset returns (18 developed economies, 1870–2020)"
+    source: "Jordà, Knoll, Kuvshinov, Schularick & Taylor, 'The Rate of Return on Everything, 1870-2015' (Macrohistory DB R6)"
+    homepage: "https://www.macrohistory.net/database/"
+    url: "https://raw.githubusercontent.com/unbalancedparentheses/forex-centuries/main/data/sources/jst/jst_macrohistory.xlsx"
+    license: >
+      Free for academic/non-commercial use; cite Jordà et al. (2019). Mirrored
+      from the forex-centuries replication repo (macrohistory.net is unreachable
+      under restrictive network policies).
+    api_key: null
+    raw: "jst_returns/jst_macrohistory.xlsx"
+    processed: "jst_returns.parquet"
+    compiler: "app.services.safe_withdrawal.data:compile_jst"
+    notes: >
+      Annual nominal total returns. Columns used: eq_tr (equity total return),
+      bond_tr (government bond total return), cpi, xrusd (local currency per USD),
+      rgdpmad (Maddison real GDP per capita), pop. The compiler emits a US-investor
+      view: us_stock = USA eq_tr; bond = USA bond_tr; inflation = USA CPI change;
+      intl_stock = GDP-weighted (rgdpmad*pop, prior-year) developed-ex-US equity
+      total return converted to USD via xrusd. Powers the safe-withdrawal reference
+      service (real international sleeve so the 3-fund genuinely differs from 60/40).
+
   shiller_returns:
     title: "Shiller U.S. Stock Market Data (S&P 500 prices, dividends, earnings, CPI, 10yr rate)"
     source: "Robert J. Shiller, Yale University (CSV mirror: github.com/datasets/s-and-p-500)"
@@ -32,8 +54,8 @@ datasets:
       Rate/GS10). We derive annual nominal total returns for stocks (price +
       reinvested dividends) and a 10yr-Treasury par-bond proxy, plus annual CPI
       inflation. Sourced from the GitHub CSV mirror because Yale/Shiller is not
-      reachable under restrictive network policies; the data is identical. Powers
-      the safe-withdrawal reference service.
+      reachable under restrictive network policies; the data is identical. Retained
+      as a US-only alternative / cross-check; the service now uses jst_returns.
 
   # --- Catalogued sources for upcoming services (acquire/compile not yet wired) ---
 
