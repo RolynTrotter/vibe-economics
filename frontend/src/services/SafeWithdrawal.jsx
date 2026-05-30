@@ -3,8 +3,10 @@
 // constant real withdrawal that depletes the portfolio to exactly $0.
 //
 // The deployed app is static (GitHub Pages, no backend), so this computes in the
-// browser from a committed snapshot (public/data/shiller_returns.json) using
-// safeWithdrawalModel.js — a 1:1 port of the tested Python model.
+// browser from a committed snapshot (public/data/jst_returns.json) using
+// safeWithdrawalModel.js — a 1:1 port of the tested Python model. The data has a
+// real international equity sleeve, so the three-fund genuinely differs from a US
+// 60/40.
 import { useEffect, useMemo, useState } from "react";
 import { loadDataset } from "../data.js";
 import * as swm from "./safeWithdrawalModel.js";
@@ -12,37 +14,45 @@ import MetricCard from "../components/MetricCard.jsx";
 import LineChart from "../components/LineChart.jsx";
 
 const PRESETS = [
-  { key: "all_stock", label: "100% stock" },
-  { key: "three_fund", label: "3-fund (~70/30)" },
-  { key: "sixty_forty", label: "60 / 40" },
+  { key: "all_stock", label: "100% US" },
+  { key: "three_fund", label: "3-fund" },
+  { key: "sixty_forty", label: "US 60 / 40" },
   { key: "custom", label: "Custom" },
 ];
 
 const pct = (v) => `${(v * 100).toFixed(2)}%`;
+const pct0 = (v) => `${Math.round(v * 100)}%`;
 
 export default function SafeWithdrawal() {
-  const [presetKey, setPresetKey] = useState("sixty_forty");
-  const [stock, setStock] = useState(0.6);
+  const [presetKey, setPresetKey] = useState("three_fund");
+  // Custom controls: overall equity share, and intl share *within* equity.
+  const [equity, setEquity] = useState(0.6);
+  const [intlShare, setIntlShare] = useState(0.4);
   const [horizon, setHorizon] = useState(30);
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
 
-  // Resolve the stock weight from the active preset (custom uses the slider).
-  const presetWeights = swm.PRESETS;
-  const stockWeight = presetKey === "custom" ? stock : presetWeights[presetKey];
+  const weights = useMemo(() => {
+    if (presetKey !== "custom") return swm.PRESETS[presetKey];
+    return {
+      us: equity * (1 - intlShare),
+      intl: equity * intlShare,
+      bond: 1 - equity,
+    };
+  }, [presetKey, equity, intlShare]);
 
   useEffect(() => {
-    loadDataset("shiller_returns").then(setData).catch((e) => setError(e.message));
+    loadDataset("jst_returns").then(setData).catch((e) => setError(e.message));
   }, []);
 
   // All computation is client-side and cheap; memoize on the inputs.
   const { summary, byYear } = useMemo(() => {
     if (!data) return { summary: null, byYear: null };
     return {
-      summary: swm.summary(data.rows, horizon, stockWeight),
-      byYear: swm.swrByStartYear(data.rows, horizon, stockWeight),
+      summary: swm.summary(data.rows, horizon, weights),
+      byYear: swm.swrByStartYear(data.rows, horizon, weights),
     };
-  }, [data, horizon, stockWeight]);
+  }, [data, horizon, weights]);
 
   const series = byYear
     ? [
@@ -70,20 +80,36 @@ export default function SafeWithdrawal() {
               </button>
             ))}
           </div>
+          <div className="footnote" style={{ marginTop: 8 }}>
+            US {pct0(weights.us)} · Intl {pct0(weights.intl)} · Bonds {pct0(weights.bond)}
+          </div>
         </div>
 
         {presetKey === "custom" && (
-          <label className="field">
-            Stock weight <span className="val">{pct(stock)}</span>
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.05"
-              value={stock}
-              onChange={(e) => setStock(parseFloat(e.target.value))}
-            />
-          </label>
+          <>
+            <label className="field">
+              Equity (vs bonds) <span className="val">{pct(equity)}</span>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.05"
+                value={equity}
+                onChange={(e) => setEquity(parseFloat(e.target.value))}
+              />
+            </label>
+            <label className="field">
+              International share of equity <span className="val">{pct(intlShare)}</span>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.05"
+                value={intlShare}
+                onChange={(e) => setIntlShare(parseFloat(e.target.value))}
+              />
+            </label>
+          </>
         )}
 
         <label className="field">
@@ -150,8 +176,8 @@ export default function SafeWithdrawal() {
             />
             <div className="footnote" style={{ marginTop: 8 }}>
               Each point is the largest constant inflation-adjusted withdrawal that
-              would have brought a {Math.round(stockWeight * 100)}/
-              {Math.round((1 - stockWeight) * 100)} portfolio to exactly $0 after{" "}
+              would have brought a portfolio of US {pct0(weights.us)} / international{" "}
+              {pct0(weights.intl)} / bonds {pct0(weights.bond)} to exactly $0 after{" "}
               {horizon} years — the perfect-hindsight ceiling. Where the blue line
               dips below the dashed 4% line, the 4% rule would have failed.
             </div>
