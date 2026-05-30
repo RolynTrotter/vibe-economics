@@ -42,6 +42,26 @@ Adding these hosts unblocks most of the catalogue with no credentials:
 > When a key is set, tell Claude the exact env-var name used and the catalog
 > `api_key:` field will be wired to match.
 
+### Observed key status (as of the subnational-GDP build, ticket 0002)
+The keyed env vars are all *present*, but several are **empty strings** — the var
+exists with no value, so `os.environ.get(...)` returns `""` and auth fails. Verified
+by actually hitting each API:
+
+| Env var | Status | Verified against |
+|---|---|---|
+| `BEA_API_KEY` | ✅ working (36-char key) | BEA Regional SAGDP2 / SASUMMARY |
+| `BLS_API_KEY` | ✅ working (32-char key) | BLS v2 CPI series |
+| `ALPHAVANTAGE_API_KEY` | set (16-char, untested) | — |
+| `FRED_API_KEY` | ⚠️ **empty** | FRED rejects (needs 32-char key) |
+| `CENSUS_API_KEY` | ⚠️ **empty** | Census returns "Missing Key" |
+| `NASDAQ_DATA_LINK_API_KEY` | ⚠️ **empty** | — |
+
+Key-free official sources confirmed reachable from canonical URLs (no mirror needed):
+**World Bank** (`api.worldbank.org`) and **IMF DataMapper** (`www.imf.org`) — both
+fetched live for ticket 0002. To unblock the next services, the empty keys
+(`CENSUS_API_KEY` for ticket 0007 median income; `FRED_API_KEY` as a general backup)
+need real values provisioned.
+
 ---
 
 ## B. Free-but-rate-limited — usage tracking policy

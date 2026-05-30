@@ -57,6 +57,26 @@ datasets:
       reachable under restrictive network policies; the data is identical. Retained
       as a US-only alternative / cross-check; the service now uses jst_returns.
 
+  subnational_gdp:
+    title: "Subnational GDP comparison — US states vs countries (nominal, PPP, per-capita)"
+    source: "BEA Regional (US state GDP & population) + World Bank WDI (country GDP/PPP/population)"
+    homepage: "https://apps.bea.gov/regional/ ; https://data.worldbank.org/"
+    url: "multi-source (BEA API + World Bank API) — see acquire() in service data.py"
+    license: >
+      BEA: U.S. Government work, public domain. World Bank WDI: CC BY 4.0.
+      Both license-clean; attribute World Bank.
+    api_key: "BEA_API_KEY"
+    raw: "subnational_gdp/"
+    processed: "subnational_gdp.parquet"
+    compiler: "app.services.subnational_gdp.data:compile_subnational_gdp"
+    notes: >
+      Multi-call acquisition, so use the service entrypoint rather than the
+      single-URL CLI:  python -m app.services.subnational_gdp.data build
+      (acquire + compile + write parquet). Tidy schema: entity_id, name, kind
+      (state|country), parent (nation id; USA for states), gdp_nominal_usd,
+      gdp_ppp_usd, population, year. US-state ppp = nominal (US ≈ PPP base; ~1.01).
+      Powers the subnational_gdp service (ticket 0002) and the shared app/core/geo.py.
+
   # --- Catalogued sources for upcoming services (acquire/compile not yet wired) ---
 
   damodaran_histret:
