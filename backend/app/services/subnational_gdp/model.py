@@ -23,6 +23,12 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+# Entities dropped from the per-capita ranking only. DC's GDP-per-capita is a
+# commuter artifact: its output is produced by a metro-wide workforce but divided
+# by DC residents alone, so it sits absurdly above every real economy. Excluded
+# until the planned metro-aware treatment lands.
+PER_CAPITA_EXCLUDE: frozenset[str] = frozenset({"US-DC"})
+
 # basis -> (column, per_capita?, label, blurb)
 BASES: dict[str, dict] = {
     "nominal": {
@@ -66,6 +72,8 @@ def ranked_table(df: pd.DataFrame, basis: str, kinds: tuple[str, ...] | None = N
     out = df.copy()
     out["value"] = basis_value(out, basis)
     out = out.dropna(subset=["value"])
+    if basis == "per_capita":
+        out = out[~out["entity_id"].isin(PER_CAPITA_EXCLUDE)]
     if kinds is not None:
         out = out[out["kind"].isin(kinds)]
     out = out.sort_values("value", ascending=False).reset_index(drop=True)

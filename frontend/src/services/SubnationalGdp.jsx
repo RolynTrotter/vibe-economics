@@ -168,6 +168,12 @@ export default function SubnationalGdp() {
                 <option key={s.id} value={s.id}>{s.name}</option>
               ))}
             </select>
+            {!match && (
+              <div className="footnote" style={{ marginTop: 10 }}>
+                {matchState} isn’t ranked on this basis. DC is excluded from the
+                per-capita view (its GDP/capita is a commuter artifact).
+              </div>
+            )}
             {match && (
               <div className="match-row">
                 <div className="match-target" style={{ borderColor: USA_BLUE }}>

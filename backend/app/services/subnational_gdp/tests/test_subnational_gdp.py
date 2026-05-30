@@ -65,6 +65,14 @@ def test_per_capita_drops_entities_without_population(df):
     assert len(model.ranked_table(df, "per_capita")) <= len(model.ranked_table(df, "nominal"))
 
 
+def test_dc_excluded_from_per_capita_only(df):
+    # DC's GDP/capita is a commuter artifact: present on total bases, dropped per-capita.
+    nominal_ids = set(model.ranked_table(df, "nominal")["entity_id"])
+    percap_ids = set(model.ranked_table(df, "per_capita")["entity_id"])
+    assert "US-DC" in nominal_ids
+    assert "US-DC" not in percap_ids
+
+
 def test_compare_preserves_request_order(df):
     rows = model.compare(df, ["FRA", "US-CA", "DEU"], "nominal")
     assert [r["entity_id"] for r in rows] == ["FRA", "US-CA", "DEU"]

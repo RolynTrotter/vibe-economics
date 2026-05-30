@@ -86,8 +86,8 @@ def export_subnational_gdp() -> None:
             "US-state PPP uses nominal USD as a proxy (US ≈ PPP reference economy; "
             "US PPP/nominal ≈ 1.01).",
             "State population is derived (personal income ÷ per-capita personal income).",
-            "DC's GDP-per-capita is inflated by commuters: output is produced by a "
-            "metro workforce but divided by DC residents only.",
+            "DC is excluded from the per-capita ranking: its GDP-per-capita is a "
+            "commuter artifact (metro-wide output divided by DC residents only).",
             "Release lags differ by source; each place carries the year of its GDP figure.",
         ],
         "entities": [

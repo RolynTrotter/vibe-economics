@@ -3,6 +3,11 @@
 // committed snapshot (public/data/subnational_gdp.json). Kept 1:1 with the tested
 // Python model so the deployed numbers equal the backend's.
 
+// Dropped from the per-capita ranking only: DC's GDP-per-capita is a commuter
+// artifact (metro-wide output ÷ DC residents). Mirrors PER_CAPITA_EXCLUDE in
+// the Python model. Excluded until the metro-aware treatment lands.
+export const PER_CAPITA_EXCLUDE = new Set(["US-DC"]);
+
 export const BASES = {
   nominal: {
     column: "gdp_nominal_usd",
@@ -45,6 +50,7 @@ export function rankedTable(entities, basis, kinds = null) {
   let rows = entities
     .map((e) => ({ ...e, value: basisValue(e, basis) }))
     .filter((e) => e.value != null);
+  if (basis === "per_capita") rows = rows.filter((e) => !PER_CAPITA_EXCLUDE.has(e.id || e.entity_id));
   if (kinds) rows = rows.filter((e) => kinds.includes(e.kind));
   rows.sort((a, b) => b.value - a.value);
   rows.forEach((r, i) => (r.rank = i + 1));

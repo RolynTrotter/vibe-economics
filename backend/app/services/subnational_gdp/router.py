@@ -35,6 +35,8 @@ def meta() -> dict:
             "US-state PPP uses nominal USD as a proxy (US ≈ PPP reference economy; "
             "US PPP/nominal ≈ 1.01 per World Bank).",
             "State population is derived (personal income ÷ per-capita personal income).",
+            "DC is excluded from the per-capita ranking: its GDP/capita is a commuter "
+            "artifact (metro-wide output divided by DC residents only).",
             "Source release lags differ; each entity carries the year of its GDP figure.",
         ],
     }
