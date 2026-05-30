@@ -1,8 +1,13 @@
 // Safe Withdrawal Backtester widget — the reference service screen.
 // Shows the "upper bound on the 4% rule": for each retirement start year, the max
 // constant real withdrawal that depletes the portfolio to exactly $0.
-import { useEffect, useState } from "react";
-import { api } from "../api.js";
+//
+// The deployed app is static (GitHub Pages, no backend), so this computes in the
+// browser from a committed snapshot (public/data/shiller_returns.json) using
+// safeWithdrawalModel.js — a 1:1 port of the tested Python model.
+import { useEffect, useMemo, useState } from "react";
+import { loadDataset } from "../data.js";
+import * as swm from "./safeWithdrawalModel.js";
 import MetricCard from "../components/MetricCard.jsx";
 import LineChart from "../components/LineChart.jsx";
 
@@ -19,47 +24,32 @@ export default function SafeWithdrawal() {
   const [presetKey, setPresetKey] = useState("sixty_forty");
   const [stock, setStock] = useState(0.6);
   const [horizon, setHorizon] = useState(30);
-  const [summary, setSummary] = useState(null);
-  const [byYear, setByYear] = useState(null);
-  const [meta, setMeta] = useState(null);
+  const [data, setData] = useState(null);
   const [error, setError] = useState(null);
-  const [loading, setLoading] = useState(true);
 
   // Resolve the stock weight from the active preset (custom uses the slider).
-  const presetWeights = { all_stock: 1.0, three_fund: 0.7, sixty_forty: 0.6 };
+  const presetWeights = swm.PRESETS;
   const stockWeight = presetKey === "custom" ? stock : presetWeights[presetKey];
 
   useEffect(() => {
-    api("/api/safe-withdrawal/meta").then(setMeta).catch((e) => setError(e.message));
+    loadDataset("shiller_returns").then(setData).catch((e) => setError(e.message));
   }, []);
 
-  useEffect(() => {
-    let alive = true;
-    setLoading(true);
-    setError(null);
-    const params = { horizon, stock: stockWeight };
-    Promise.all([
-      api("/api/safe-withdrawal/summary", params),
-      api("/api/safe-withdrawal/by-year", params),
-    ])
-      .then(([s, b]) => {
-        if (!alive) return;
-        setSummary(s);
-        setByYear(b);
-      })
-      .catch((e) => alive && setError(e.message))
-      .finally(() => alive && setLoading(false));
-    return () => {
-      alive = false;
+  // All computation is client-side and cheap; memoize on the inputs.
+  const { summary, byYear } = useMemo(() => {
+    if (!data) return { summary: null, byYear: null };
+    return {
+      summary: swm.summary(data.rows, horizon, stockWeight),
+      byYear: swm.swrByStartYear(data.rows, horizon, stockWeight),
     };
-  }, [stockWeight, horizon]);
+  }, [data, horizon, stockWeight]);
 
   const series = byYear
     ? [
         {
           label: "Max safe withdrawal (per start year)",
           color: "#64d2ff",
-          points: byYear.points.map((p) => ({ x: p.start_year, y: p.swr })),
+          points: byYear.map((p) => ({ x: p.start_year, y: p.swr })),
         },
       ]
     : [];
@@ -110,7 +100,7 @@ export default function SafeWithdrawal() {
       </div>
 
       {error && <div className="panel error">Error: {error}</div>}
-      {loading && !summary && <div className="panel loading">Computing…</div>}
+      {!data && !error && <div className="panel loading">Loading data…</div>}
 
       {summary && (
         <>
@@ -169,10 +159,10 @@ export default function SafeWithdrawal() {
         </>
       )}
 
-      {meta && (
+      {data && (
         <div className="panel footnote">
-          Source: {meta.source}. Data {meta.first_year}–{meta.last_year} ({meta.n_years} yrs),{" "}
-          {meta.units}. {meta.notes}
+          Source: {data.source}. Data {data.first_year}–{data.last_year} ({data.n_years} yrs),{" "}
+          {data.units}. {data.notes}
         </div>
       )}
     </div>
