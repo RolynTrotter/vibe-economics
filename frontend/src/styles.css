@@ -178,3 +178,28 @@ a { color: var(--accent); }
 .lremoved { color: var(--muted); font-size: 0.72rem; font-style: italic; }
 
 .lest { font-size: 0.6rem; color: var(--muted); border: 1px solid var(--border); border-radius: 4px; padding: 0 3px; margin-left: 5px; vertical-align: middle; text-transform: uppercase; letter-spacing: .02em; }
+
+/* Scrollable name column when metro punch-out appends a long removed list */
+.lname-scroll { overflow-x: auto; overflow-y: hidden; text-overflow: clip; scrollbar-width: none; }
+.lname-scroll::-webkit-scrollbar { display: none; }
+
+/* Stale-year superscript on median income rows */
+.lmi-yr { font-size: 0.6rem; margin-left: 3px; font-style: normal; font-variant-numeric: tabular-nums; }
+.lmi-yr.lagged { color: var(--accent-2); }
+.lmi-yr.stale  { color: var(--danger); }
+
+/* Collapsible methodology footnote */
+.methodology summary {
+  cursor: pointer;
+  list-style: none;
+  font-weight: 600;
+  color: var(--muted);
+  padding: 2px 0 6px;
+  user-select: none;
+}
+.methodology summary::-webkit-details-marker { display: none; }
+.methodology summary::before { content: "▸ "; font-size: 0.7em; }
+details.methodology[open] summary::before { content: "▾ "; }
+.method-body { padding-top: 8px; }
+.method-body p { margin: 0 0 10px; line-height: 1.6; }
+.method-body p:last-child { margin-bottom: 0; }
