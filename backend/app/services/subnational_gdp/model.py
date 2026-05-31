@@ -47,6 +47,14 @@ BASES: dict[str, dict] = {
         "label": "GDP per capita (PPP)",
         "blurb": "PPP GDP divided by population — a living-standards lens.",
     },
+    "median_income": {
+        "column": "median_income_ppp_usd", "per_capita": False,
+        "label": "Median income (PPP)",
+        "blurb": "Median disposable income (equivalised), PPP $ — what a typical "
+                 "household lives on, not output per head. US states: Census median "
+                 "household income, scaled to the OECD equivalised scale via the US "
+                 "anchor. OECD/EU coverage; not size-adjusted across countries.",
+    },
 }
 
 

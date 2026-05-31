@@ -29,6 +29,15 @@ export const BASES = {
     label: "GDP per capita (PPP)",
     blurb: "PPP GDP divided by population — a living-standards lens.",
   },
+  median_income: {
+    column: "median_income_ppp_usd",
+    perCapita: false,
+    label: "Median income (PPP)",
+    blurb:
+      "Median disposable income (PPP $) — what a typical household lives on, not " +
+      "output per head. GDP/capita is extraction-skewed (Norway, North Dakota); this " +
+      "is not. OECD/EU + US coverage; not size-adjusted across countries.",
+  },
 };
 
 // Value for one entity on a basis, or null when inputs are missing.

@@ -1,6 +1,9 @@
 # Ticket 0007 — Subnational comparison: median-income basis
 
-**Status:** planned (blocked on data access)
+**Status:** BUILT — `CENSUS_API_KEY` is now provisioned. Countries: OECD IDD median
+equivalised disposable income ÷ World Bank consumption PPP. US states: Census ACS
+median household income, anchored to the OECD equivalised scale via the US ratio.
+Added as the `median_income` basis; metro punch-out is hidden on it (GDP-only tool).
 **Service id:** `subnational_gdp` (extends the built service)
 **Depends on:** [0006 — data-access wishlist](0006-data-access-wishlist.md) — specifically a
 **working `CENSUS_API_KEY`** (the env var currently exists but is blank) plus Eurostat

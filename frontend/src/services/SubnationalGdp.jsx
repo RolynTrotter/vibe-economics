@@ -16,6 +16,7 @@ const BASES = [
   { key: "nominal", label: "Total GDP" },
   { key: "ppp", label: "GDP (PPP)" },
   { key: "per_capita", label: "Per capita" },
+  { key: "median_income", label: "Median income" },
 ];
 
 const KINDS = [
@@ -79,7 +80,10 @@ export default function SubnationalGdp() {
 
   const kinds = KINDS.find((k) => k.key === kindKey)?.kinds ?? null;
   const isPerCapita = basis === "per_capita";
-  const punchout = removeCapital || removeLargest || removeRichest;
+  const smallVal = isPerCapita || basis === "median_income"; // plain-$ formatting
+  // Metro punch-out is GDP-only: there's no metro-level median income to subtract.
+  const punchoutAllowed = basis !== "median_income";
+  const punchout = punchoutAllowed && (removeCapital || removeLargest || removeRichest);
   const hinterland = punchout && data?.hinterland?.places?.length;
 
   const table = useMemo(() => {
@@ -155,6 +159,7 @@ export default function SubnationalGdp() {
           ))}
         </div>
 
+        {punchoutAllowed ? (
         <div>
           <div className="footnote" style={{ marginBottom: 6 }}>
             Punch out global cities <span style={{ opacity: 0.7 }}>· OECD countries only</span>
@@ -182,6 +187,12 @@ export default function SubnationalGdp() {
             </div>
           )}
         </div>
+        ) : (
+          <div className="footnote" style={{ alignSelf: "center" }}>
+            Median income — what a typical household lives on. Metro punch-out is a
+            GDP-only tool, so it’s off here.
+          </div>
+        )}
 
         <input
           className="search"
@@ -217,7 +228,7 @@ export default function SubnationalGdp() {
                 <div className="match-target" style={{ borderColor: USA_BLUE }}>
                   <div className="label">{match.entity.name}</div>
                   <div className="value">
-                    {isPerCapita ? fmtPerCapita(match.entity.value) : fmtUSD(match.entity.value)}
+                    {smallVal ? fmtPerCapita(match.entity.value) : fmtUSD(match.entity.value)}
                   </div>
                   <div className="sub">#{match.entity.rank} overall · {match.entity.year}</div>
                 </div>
@@ -227,7 +238,7 @@ export default function SubnationalGdp() {
                     <div key={n.id} className="match-country">
                       <span className="swatch" style={{ background: regionColor(n.region) }} />
                       <span className="cname">{n.name}</span>
-                      <span className="cval">{isPerCapita ? fmtPerCapita(n.value) : fmtUSD(n.value)}</span>
+                      <span className="cval">{smallVal ? fmtPerCapita(n.value) : fmtUSD(n.value)}</span>
                     </div>
                   ))}
                 </div>
@@ -269,7 +280,7 @@ export default function SubnationalGdp() {
                     <span className="lbar-wrap">
                       <span className="lbar" style={{ width: `${w}%`, background: color }} />
                     </span>
-                    <span className="lval">{isPerCapita ? fmtPerCapita(e.value) : fmtUSD(e.value)}</span>
+                    <span className="lval">{smallVal ? fmtPerCapita(e.value) : fmtUSD(e.value)}</span>
                   </div>
                 );
               })}

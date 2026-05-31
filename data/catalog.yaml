@@ -98,6 +98,24 @@ datasets:
       out" a metro from its country), PPP GDP, and derived population. Powers the
       hinterland comparison (ticket 0008). Coverage is OECD/EU only.
 
+  median_income:
+    title: "Median income (PPP) — US states (Census ACS household) + countries (OECD IDD equivalised disposable)"
+    source: "Census ACS B19013 + OECD Income Distribution Database (DSD_WISE_IDD@DF_IDD) + World Bank consumption PPP (PA.NUS.PRVT.PP)"
+    homepage: "https://www.oecd.org/social/income-distribution-database.htm"
+    url: "https://sdmx.oecd.org/public/rest/data/OECD.WISE.INE,DSD_WISE_IDD@DF_IDD,/.A.INC_DISP.MEDIAN.XDC_HH_EQ._T.METH2012.D_CUR._Z"
+    license: "OECD terms (free reuse w/ attribution); Census & World Bank public/CC BY 4.0."
+    api_key: "CENSUS_API_KEY"
+    raw: "median_income/"
+    processed: "median_income.parquet"
+    compiler: "app.services.subnational_gdp.median_income:compile_median_income"
+    notes: >
+      Multi-call acquisition; build via:
+      python -m app.services.subnational_gdp.median_income build.
+      Countries: OECD IDD median equivalised disposable income (national currency)
+      ÷ World Bank private-consumption PPP. US states: Census ACS median household
+      income scaled by the US anchor ratio onto the OECD equivalised scale. Adds the
+      "median income (PPP)" basis (ticket 0007); OECD/EU coverage.
+
   us_state_metros:
     title: "US metros by state (CSA-first footprint; in-state county GDP & population) — per-state metro punch-out"
     source: "Census/OMB 2023 CBSA/CSA delineation + BEA county GDP (CAGDP2) & population (CAINC1)"
