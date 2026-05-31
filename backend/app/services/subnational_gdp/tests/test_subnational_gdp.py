@@ -171,6 +171,27 @@ def test_hinterland_unknown_basis_raises(country_places):
         model.hinterland_table(country_places, "bananas", True, False)
 
 
+def test_richest_metro_and_three_way_fallback(country_places):
+    us = _metros_of(country_places, "USA")
+    # Richest US metro by GDP/capita is San Francisco (Greater).
+    richest = model.select_removed_metros(us, remove_capital=False, remove_largest=False,
+                                          remove_richest=True)
+    assert "San Francisco (Greater)" in {r["name"] for r in richest}
+    # All three toggles -> three distinct metros (NYC largest, DC capital, SF richest).
+    three = model.select_removed_metros(us, remove_capital=True, remove_largest=True,
+                                        remove_richest=True)
+    assert len({r["code"] for r in three}) == 3
+    names = {r["name"] for r in three}
+    assert {"New York (Greater)", "Washington (Greater)", "San Francisco (Greater)"} == names
+
+
+def test_three_toggles_always_distinct_count(country_places):
+    # Even where capital == largest == richest, three toggles remove three metros.
+    for p in country_places:
+        n = len(model.select_removed_metros(p["metros"], True, True, True))
+        assert n == min(3, len(p["metros"]))
+
+
 # --- per-US-state punch-out (ticket 0008 phase 2) ------------------------------
 def test_state_metros_use_broad_csa_footprint(us_metros):
     # New York's largest metro is the NY-Newark CSA (incl. the Hudson Valley), not

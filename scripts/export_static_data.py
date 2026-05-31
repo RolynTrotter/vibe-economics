@@ -125,7 +125,8 @@ def _round_place(p: dict) -> dict:
         "metros": [
             {"code": m["code"], "name": m["name"], "is_capital": m["is_capital"],
              "gdp_share_pct": round(m["gdp_share_pct"], 3),
-             "population": None if m["population"] is None else round(m["population"])}
+             "population": None if m["population"] is None else round(m["population"]),
+             "per_capita": None if m.get("per_capita") is None else round(m["per_capita"])}
             for m in p["metros"]
         ],
     }

@@ -86,33 +86,48 @@ def ranked_table(df: pd.DataFrame, basis: str, kinds: tuple[str, ...] | None = N
 # Metro punch-out ("hinterland" comparison) — ticket 0008
 # --------------------------------------------------------------------------- #
 def select_removed_metros(
-    metros: list[dict], remove_capital: bool, remove_largest: bool
+    metros: list[dict], remove_capital: bool, remove_largest: bool,
+    remove_richest: bool = False,
 ) -> list[dict]:
     """Which metros to punch out of one *place* (country or US state), per toggles.
 
-    `metros` is a list of metro dicts, each with ``code``, ``is_capital`` and
-    ``gdp_share_pct``. Rules:
+    `metros` is a list of metro dicts with ``code``, ``is_capital``,
+    ``gdp_share_pct`` and ``per_capita``. Each checked toggle nominates one metro:
     - remove_largest  -> the top-GDP-share metro.
     - remove_capital  -> the capital metro.
-    - both, and they're the *same* metro (London, Paris, Tokyo; or a state whose
-      capital is its largest metro, e.g. Denver) -> also drop the next-largest, so
-      two distinct metros come out.
+    - remove_richest  -> the highest-GDP-per-capita metro.
+
+    When picks coincide (London is capital *and* largest; the Bay Area may be
+    largest *and* richest), each toggle "falls down" to the next-best in its own
+    ranking, and any remaining shortfall is filled by next-largest GDP — so the
+    number of distinct metros removed equals the number of toggles checked.
     """
-    rows = sorted(metros, key=lambda r: r["gdp_share_pct"], reverse=True)
+    rows = [r for r in metros]
     if not rows:
         return []
+    by_gdp = sorted(rows, key=lambda r: r["gdp_share_pct"], reverse=True)
+    by_pc = sorted((r for r in rows if r.get("per_capita")),
+                   key=lambda r: r["per_capita"], reverse=True)
+    n_targets = sum([remove_capital, remove_largest, remove_richest])
     chosen: dict[str, dict] = {}
+
     if remove_largest:
-        chosen[rows[0]["code"]] = rows[0]
+        pick = next((r for r in by_gdp if r["code"] not in chosen), None)
+        if pick:
+            chosen[pick["code"]] = pick
     if remove_capital:
         cap = next((r for r in rows if r["is_capital"]), None)
         if cap is not None:
             chosen[cap["code"]] = cap
-    if remove_capital and remove_largest and len(chosen) < 2:
-        for r in rows:                       # capital == largest: add next-largest
-            if r["code"] not in chosen:
-                chosen[r["code"]] = r
-                break
+    if remove_richest:
+        pick = next((r for r in by_pc if r["code"] not in chosen), None)
+        if pick:
+            chosen[pick["code"]] = pick
+    # Fill any shortfall (coinciding picks, e.g. capital == largest) by next-largest.
+    for r in by_gdp:
+        if len(chosen) >= n_targets:
+            break
+        chosen.setdefault(r["code"], r)
     return list(chosen.values())
 
 
@@ -132,7 +147,9 @@ def country_places(metros: pd.DataFrame, names: dict[str, str] | None = None) ->
             "metros": [
                 {"code": r.fua_code, "name": r.fua_name, "is_capital": bool(r.is_capital),
                  "gdp_share_pct": float(r.gdp_share_pct),
-                 "population": None if pd.isna(r.fua_population) else float(r.fua_population)}
+                 "population": None if pd.isna(r.fua_population) else float(r.fua_population),
+                 "per_capita": (float(r.fua_gdp_ppp_usd) / float(r.fua_population))
+                               if (pd.notna(r.fua_population) and r.fua_population) else None}
                 for r in g.itertuples()
             ],
         })
@@ -166,7 +183,9 @@ def state_places(us_metros: pd.DataFrame, entities: pd.DataFrame) -> list[dict]:
             "metros": [
                 {"code": r.metro_id, "name": r.metro_name, "is_capital": bool(r.has_state_capital),
                  "gdp_share_pct": float(r.in_state_gdp) / state_gdp * 100.0,
-                 "population": float(r.in_state_pop)}
+                 "population": float(r.in_state_pop),
+                 "per_capita": (float(r.in_state_gdp) / float(r.in_state_pop))
+                               if r.in_state_pop else None}
                 for r in g.itertuples()
             ],
         })
@@ -180,7 +199,8 @@ MIN_RESIDUAL_FRACTION = 0.12
 
 
 def hinterland_table(
-    places: list[dict], basis: str, remove_capital: bool, remove_largest: bool
+    places: list[dict], basis: str, remove_capital: bool, remove_largest: bool,
+    remove_richest: bool = False,
 ) -> pd.DataFrame:
     """Ladder of `places` (countries and/or US states) with each one's selected
     metro(s) punched out and the remainder recomputed on `basis`.
@@ -194,7 +214,7 @@ def hinterland_table(
         raise ValueError(f"Unknown basis '{basis}'. Options: {list(BASES)}")
     rows = []
     for p in places:
-        removed = select_removed_metros(p["metros"], remove_capital, remove_largest)
+        removed = select_removed_metros(p["metros"], remove_capital, remove_largest, remove_richest)
         share = sum(r["gdp_share_pct"] for r in removed) / 100.0
         pop_removed = sum((r["population"] or 0.0) for r in removed)
         rest_pop = p["nat_population"] - pop_removed

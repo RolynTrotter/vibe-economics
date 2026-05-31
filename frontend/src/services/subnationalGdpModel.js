@@ -59,21 +59,32 @@ export function rankedTable(entities, basis, kinds = null) {
 
 // --- Metro punch-out ("hinterland" comparison) — mirrors model.py (ticket 0008) ---
 
-// Which FUAs to punch out of one country, given the toggles. `metros` is that
-// country's metros (sorted by GDP share, desc). If both toggles are on and the
-// capital IS the largest (London, Paris, Tokyo), also drop the next-largest so two
-// distinct metros come out.
-export function selectRemovedMetros(metros, removeCapital, removeLargest) {
-  const rows = [...metros].sort((a, b) => b.gdp_share_pct - a.gdp_share_pct);
+// Which metros to punch out of one place, given the toggles. Each checked toggle
+// nominates one metro (largest by GDP share, capital, richest by per-capita); when
+// picks coincide each falls to the next-best in its ranking and any shortfall is
+// filled by next-largest GDP, so #distinct removed == #toggles checked.
+export function selectRemovedMetros(metros, removeCapital, removeLargest, removeRichest = false) {
+  const rows = [...metros];
   if (!rows.length) return [];
+  const byGdp = [...rows].sort((a, b) => b.gdp_share_pct - a.gdp_share_pct);
+  const byPc = rows.filter((r) => r.per_capita).sort((a, b) => b.per_capita - a.per_capita);
+  const nTargets = (removeCapital ? 1 : 0) + (removeLargest ? 1 : 0) + (removeRichest ? 1 : 0);
   const chosen = new Map();
-  if (removeLargest) chosen.set(rows[0].code, rows[0]);
+  if (removeLargest) {
+    const pick = byGdp.find((r) => !chosen.has(r.code));
+    if (pick) chosen.set(pick.code, pick);
+  }
   if (removeCapital) {
     const cap = rows.find((r) => r.is_capital);
     if (cap) chosen.set(cap.code, cap);
   }
-  if (removeCapital && removeLargest && chosen.size < 2) {
-    for (const r of rows) if (!chosen.has(r.code)) { chosen.set(r.code, r); break; }
+  if (removeRichest) {
+    const pick = byPc.find((r) => !chosen.has(r.code));
+    if (pick) chosen.set(pick.code, pick);
+  }
+  for (const r of byGdp) {
+    if (chosen.size >= nTargets) break;
+    if (!chosen.has(r.code)) chosen.set(r.code, r);
   }
   return [...chosen.values()];
 }
@@ -84,13 +95,13 @@ export const MIN_RESIDUAL_FRACTION = 0.12;
 
 // Ladder of `places` (countries and/or US states) with each one's selected metro(s)
 // punched out. Mirrors model.hinterland_table. `kinds` optionally filters by kind.
-export function hinterlandTable(places, basis, removeCapital, removeLargest, kinds = null) {
+export function hinterlandTable(places, basis, removeCapital, removeLargest, removeRichest = false, kinds = null) {
   const spec = BASES[basis];
   if (!spec) throw new Error(`Unknown basis '${basis}'`);
   const rows = [];
   for (const p of places) {
     if (kinds && !kinds.includes(p.kind)) continue;
-    const removed = selectRemovedMetros(p.metros, removeCapital, removeLargest);
+    const removed = selectRemovedMetros(p.metros, removeCapital, removeLargest, removeRichest);
     const share = removed.reduce((s, r) => s + r.gdp_share_pct, 0) / 100;
     const popRemoved = removed.reduce((s, r) => s + (r.population || 0), 0);
     const restPop = p.nat_population - popRemoved;
