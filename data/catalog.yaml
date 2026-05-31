@@ -21,13 +21,12 @@ datasets:
     title: "Jordà-Schularick-Taylor Macrohistory — annual asset returns (18 developed economies, 1870–2020)"
     source: "Jordà, Knoll, Kuvshinov, Schularick & Taylor, 'The Rate of Return on Everything, 1870-2015' (Macrohistory DB R6)"
     homepage: "https://www.macrohistory.net/database/"
-    url: "https://raw.githubusercontent.com/unbalancedparentheses/forex-centuries/main/data/sources/jst/jst_macrohistory.xlsx"
+    url: "https://www.macrohistory.net/app/download/9834512569/JSTdatasetR6.xlsx"
     license: >
-      Free for academic/non-commercial use; cite Jordà et al. (2019). Mirrored
-      from the forex-centuries replication repo (macrohistory.net is unreachable
-      under restrictive network policies).
+      Free for academic/non-commercial use; cite Jordà et al. (2019).
+      Downloaded directly from macrohistory.net (canonical source).
     api_key: null
-    raw: "jst_returns/jst_macrohistory.xlsx"
+    raw: "jst_returns/JSTdatasetR6.xlsx"
     processed: "jst_returns.parquet"
     compiler: "app.services.safe_withdrawal.data:compile_jst"
     notes: >
@@ -276,3 +275,68 @@ datasets:
     processed: null
     compiler: null
     notes: "Key-free SDMX API. Comparative price levels, PPPs. License-clean alternative for cost-of-living."
+
+  # --- Section C — staged entries (acquire/compile not yet wired) ---
+
+  bls:
+    title: "U.S. Bureau of Labor Statistics (CPI detail, employment, wages)"
+    source: "U.S. Bureau of Labor Statistics"
+    homepage: "https://www.bls.gov/developers/"
+    url: "https://api.bls.gov/publicAPI/v2/timeseries/data/"
+    license: "U.S. Government work, public domain."
+    api_key: "BLS_API_KEY"
+    raw: null
+    processed: null
+    compiler: null
+    free_tier_limit: "500 queries/day, 50 series/query (registered v2)"
+    notes: >
+      Registered v2 key required for 500 queries/day (unregistered v1 = 25/day).
+      POST-based API: send {"seriesid": [...], "startyear": "...", "endyear": "...",
+      "registrationkey": "..."} body. CPI detail, employment, wages series.
+      Acquire/compile not yet wired.
+
+  census:
+    title: "U.S. Census Bureau American Community Survey (demographics, income, housing)"
+    source: "U.S. Census Bureau"
+    homepage: "https://www.census.gov/data/developers/data-sets/acs-5year.html"
+    url: "https://api.census.gov/data/{year}/acs/acs5?get={variables}&for={geography}&key={api_key}"
+    license: "U.S. Government work, public domain."
+    api_key: "CENSUS_API_KEY"
+    raw: null
+    processed: null
+    compiler: null
+    free_tier_limit: "500 queries/day per key"
+    notes: >
+      Free key required. ACS 5-year estimates: demographics, income, housing cost.
+      Prefer wide queries (many variables in one call) to stay under daily limit.
+      Acquire/compile not yet wired.
+
+  nasdaq_data_link:
+    title: "Nasdaq Data Link (Quandl) — financial and commodity time series"
+    source: "Nasdaq Data Link"
+    homepage: "https://data.nasdaq.com/"
+    url: "https://data.nasdaq.com/api/v3/datasets/{database}/{dataset}/data.json?api_key={api_key}"
+    license: "Varies by dataset; many free-tier datasets are CC or public domain."
+    api_key: "NASDAQ_DATA_LINK_API_KEY"
+    raw: null
+    processed: null
+    compiler: null
+    free_tier_limit: "50 calls/day anonymous; higher with free key"
+    notes: >
+      Broad financial/commodity time series. Rate-limited free tier.
+      Acquire/compile not yet wired.
+
+  alpha_vantage:
+    title: "Alpha Vantage — equities, FX, crypto time series"
+    source: "Alpha Vantage"
+    homepage: "https://www.alphavantage.co/"
+    url: "https://www.alphavantage.co/query?function={function}&symbol={symbol}&apikey={api_key}"
+    license: "Free tier with attribution; see Alpha Vantage terms of service."
+    api_key: "ALPHAVANTAGE_API_KEY"
+    raw: null
+    processed: null
+    compiler: null
+    free_tier_limit: "25 requests/day, 5/min"
+    notes: >
+      Very tight rate limit — cache aggressively; only use when no alternative source
+      covers the required series. Acquire/compile not yet wired.
