@@ -176,7 +176,8 @@ export default function SubnationalGdp() {
               {" "}({[removeCapital && "capital", removeLargest && "largest",
                     removeRichest && "richest (GDP/capita)"].filter(Boolean).join(", ")}),
               recomputed on what’s left. US states (CSA footprint, by county) sit
-              alongside OECD countries (FUA). Non-OECD countries and places that are
+              alongside OECD countries (FUA) and big non-OECD economies (China, India,
+              Brazil… marked <em>est.</em> — curated metro estimates). Places that are
               essentially all-metro (e.g. New Jersey) are hidden.
             </div>
           )}
@@ -260,6 +261,7 @@ export default function SubnationalGdp() {
                     <span className="lrank">{e.rank}</span>
                     <span className="lname">
                       {e.name}
+                      {e.curated ? <span className="lest" title="curated metro estimate">est.</span> : null}
                       {e.removed?.length ? (
                         <span className="lremoved"> − {e.removed.join(", ")}</span>
                       ) : null}

@@ -1,8 +1,23 @@
 # Ticket 0008 — Metro punch-out / "hinterland" comparison
 
-**Status:** Phase 1 BUILT (country-level) · Phase 2 BUILT (per-US-state, CSA county footprint).
+**Status:** Phase 1 BUILT (country-level) · Phase 2 BUILT (per-US-state, CSA county
+footprint) · Phase 3 BUILT (non-OECD countries, curated metro estimates).
 **Service id:** `subnational_gdp` (extends it; new dataset `subnational_metros`)
 **Depends on:** OECD SDMX (key-free, allowlisted) + World Bank WDI.
+
+## Phase 3 — non-OECD countries (BUILT, best effort)
+OECD FUA data is OECD/EU-only, so China/India/Brazil/Russia and other big non-OECD
+economies vanished from the punch-out view. There is **no clean global metro-GDP API**,
+so `nonoecd_metros.py` (dataset `nonoecd_metros`) adds a deliberately *curated*,
+flagged-as-estimate table: each country's capital / largest / (where distinct) richest
+metro with an approximate recent **nominal** metro GDP (USD) + metropolitan population
+from public reporting. The GDP **share** is recomputed against the same World Bank
+national totals (internally consistent); per-capita is scaled to PPP via the national
+PPP/nominal ratio. `model.nonoecd_places()` emits them in the same `place` shape (marked
+`curated=True`); the widget tags them **est.** 15 countries (China, India, Brazil,
+Russia, Indonesia, Saudi, Argentina, South Africa, Egypt, Nigeria, Thailand, Philippines,
+Vietnam, Pakistan, Bangladesh). Headline: **primacy** — China barely moves (−5%) but
+Bangkok/Manila/Lagos/Joburg dominate (−24% to −39%). Ballpark figures, flagged as such.
 
 ## The question
 National GDP-per-capita is propped up by one or two global cities. London is **28%**

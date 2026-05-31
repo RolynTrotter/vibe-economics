@@ -192,6 +192,40 @@ def state_places(us_metros: pd.DataFrame, entities: pd.DataFrame) -> list[dict]:
     return places
 
 
+def nonoecd_places(curated: pd.DataFrame, entities: pd.DataFrame) -> list[dict]:
+    """Build hinterland `place` dicts for big non-OECD countries from the curated
+    metro table (ticket 0008 phase 3). National totals come from the World Bank
+    entities; each metro's GDP share is its (curated, nominal) metro GDP over national
+    nominal GDP, and per-capita is scaled to PPP via the national PPP/nominal ratio.
+    Marked ``curated=True`` so the UI can flag these as estimates."""
+    ent = entities[entities.kind == "country"].set_index("entity_id")
+    places = []
+    for iso3, g in curated.groupby("country_iso3"):
+        if iso3 not in ent.index:
+            continue
+        row = ent.loc[iso3]
+        nat_nom = float(row["gdp_nominal_usd"])
+        nat_ppp = float(row["gdp_ppp_usd"]) if pd.notna(row["gdp_ppp_usd"]) else nat_nom
+        ppp_ratio = nat_ppp / nat_nom if nat_nom else 1.0
+        metros = []
+        for r in g.itertuples():
+            pop = float(r.population)
+            metros.append({
+                "code": f"{iso3}-{r.metro_name[:6]}", "name": r.metro_name,
+                "is_capital": bool(r.is_capital),
+                "gdp_share_pct": float(r.metro_gdp_nominal_usd) / nat_nom * 100.0,
+                "population": pop,
+                "per_capita": (float(r.metro_gdp_nominal_usd) * ppp_ratio / pop) if pop else None,
+            })
+        places.append({
+            "id": iso3, "name": row["name"], "kind": "country", "region": row["region"],
+            "nat_gdp_nominal_usd": nat_nom, "nat_gdp_ppp_usd": nat_ppp,
+            "nat_population": float(row["population"]), "year": int(row["year"]),
+            "metros": metros, "curated": True,
+        })
+    return places
+
+
 # A place whose residual population/GDP after removal is below this fraction of the
 # whole is treated as having no meaningful hinterland (e.g. New Jersey or Rhode
 # Island — essentially all metro). Excluded rather than shown as an unstable ratio.
@@ -233,6 +267,7 @@ def hinterland_table(
             "entity_id": p["id"], "name": p["name"], "kind": p["kind"],
             "region": p.get("region"), "value": value, "year": p["year"],
             "removed": [r["name"] for r in removed], "removed_share": share,
+            "curated": bool(p.get("curated", False)),
         })
     out = pd.DataFrame(rows).sort_values("value", ascending=False).reset_index(drop=True)
     out["rank"] = np.arange(1, len(out) + 1)

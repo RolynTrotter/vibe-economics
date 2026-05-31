@@ -114,7 +114,7 @@ export function hinterlandTable(places, basis, removeCapital, removeLargest, rem
     else value = restPpp / restPop;
     if (value == null) continue;
     rows.push({
-      id: p.id, entity_id: p.id, name: p.name, kind: p.kind,
+      id: p.id, entity_id: p.id, name: p.name, kind: p.kind, curated: !!p.curated,
       parent: p.kind === "state" ? "USA" : p.id, region: p.region, value, year: p.year,
       removed: removed.map((r) => r.name), removed_share: share,
     });

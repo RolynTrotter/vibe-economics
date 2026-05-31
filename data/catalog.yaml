@@ -116,6 +116,23 @@ datasets:
       work) and county population (residence). Powers phase 2 of ticket 0008; see
       docs/tickets/0008-metro-allocation-analysis.md.
 
+  nonoecd_metros:
+    title: "Non-OECD metros (curated) — capital/largest/richest metro GDP & population for big non-OECD economies"
+    source: "Curated from national statistical offices / city yearbooks / public reporting (~2022-2024); shares computed vs World Bank national GDP"
+    homepage: "https://en.wikipedia.org/wiki/List_of_cities_by_GDP"
+    url: null
+    license: "Curated estimates; underlying figures are public-domain national statistics."
+    api_key: null
+    raw: null
+    processed: "nonoecd_metros.parquet"
+    compiler: "app.services.subnational_gdp.nonoecd_metros:compile_nonoecd_metros"
+    notes: >
+      No global metro-GDP API exists, so this is a deliberately curated, flagged-as-
+      estimate table (China, India, Brazil, Russia, Indonesia, Saudi, Argentina, South
+      Africa, Egypt, Nigeria, Thailand, Philippines, Vietnam, Pakistan, Bangladesh).
+      Adds non-OECD countries to the hinterland punch-out view (ticket 0008 phase 3).
+      Build: python -m app.services.subnational_gdp.nonoecd_metros build.
+
   damodaran_histret:
     title: "Historical Returns on Stocks, Bonds and Bills - United States"
     source: "Aswath Damodaran, NYU Stern"
