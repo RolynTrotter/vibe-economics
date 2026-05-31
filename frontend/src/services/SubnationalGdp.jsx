@@ -73,16 +73,20 @@ export default function SubnationalGdp() {
   const [removeCapital, setRemoveCapital] = useState(false);
   const [removeLargest, setRemoveLargest] = useState(false);
   const [removeRichest, setRemoveRichest] = useState(false);
+  const [excludeCities, setExcludeCities] = useState(false);
 
   useEffect(() => {
     loadDataset("subnational_gdp").then(setData).catch((e) => setError(e.message));
   }, []);
 
   const kinds = KINDS.find((k) => k.key === kindKey)?.kinds ?? null;
+  const isMedian = basis === "median_income";
+  // Median basis: "exclude cities" switches to the directly-measured rural median.
+  const effectiveBasis = isMedian && excludeCities ? "median_income_rural" : basis;
   const isPerCapita = basis === "per_capita";
-  const smallVal = isPerCapita || basis === "median_income"; // plain-$ formatting
+  const smallVal = isPerCapita || isMedian; // plain-$ formatting (median + rural)
   // Metro punch-out is GDP-only: there's no metro-level median income to subtract.
-  const punchoutAllowed = basis !== "median_income";
+  const punchoutAllowed = !isMedian;
   const punchout = punchoutAllowed && (removeCapital || removeLargest || removeRichest);
   const hinterland = punchout && data?.hinterland?.places?.length;
 
@@ -92,8 +96,8 @@ export default function SubnationalGdp() {
       if (!data.hinterland?.places?.length) return [];
       return m.hinterlandTable(data.hinterland.places, basis, removeCapital, removeLargest, removeRichest, kinds);
     }
-    return m.rankedTable(data.entities, basis, kinds);
-  }, [data, basis, kindKey, removeCapital, removeLargest, removeRichest]);
+    return m.rankedTable(data.entities, effectiveBasis, kinds);
+  }, [data, effectiveBasis, kindKey, removeCapital, removeLargest, removeRichest, punchout, basis]);
 
   const q = query.trim().toLowerCase();
   const filtered = useMemo(
@@ -109,8 +113,8 @@ export default function SubnationalGdp() {
     [data]
   );
   const match = useMemo(
-    () => (data ? m.nearest(data.entities, matchState, basis, 3, "country") : null),
-    [data, matchState, basis]
+    () => (data ? m.nearest(data.entities, matchState, effectiveBasis, 3, "country") : null),
+    [data, matchState, effectiveBasis]
   );
 
   // ---- FLIP: animate rows from their previous position to the new one. ----
@@ -134,7 +138,7 @@ export default function SubnationalGdp() {
     prevPos.current = newPos;
   }, [basis, kindKey, visible.length, q, removeCapital, removeLargest]);
 
-  const basisSpec = m.BASES[basis];
+  const basisSpec = m.BASES[effectiveBasis];
 
   return (
     <div>
@@ -188,9 +192,20 @@ export default function SubnationalGdp() {
           )}
         </div>
         ) : (
-          <div className="footnote" style={{ alignSelf: "center" }}>
-            Median income — what a typical household lives on. Metro punch-out is a
-            GDP-only tool, so it’s off here.
+          <div>
+            <div className="footnote" style={{ marginBottom: 6 }}>
+              Exclude big cities <span style={{ opacity: 0.7 }}>· rural median, EU + US</span>
+            </div>
+            <div className="seg">
+              <button className={excludeCities ? "active" : ""} onClick={() => setExcludeCities((v) => !v)}>
+                {excludeCities ? "✓ " : ""}Outside the cities
+              </button>
+            </div>
+            <div className="footnote" style={{ marginTop: 8 }}>
+              {excludeCities
+                ? "Median income outside the big cities — Europe: Eurostat rural areas; US states: nonmetro counties. Directly measured (medians can’t be subtracted). Places without a rural figure drop out."
+                : "What a typical household lives on. Toggle to compare the median outside the big cities."}
+            </div>
           </div>
         )}
 

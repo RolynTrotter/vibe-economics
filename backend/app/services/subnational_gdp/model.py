@@ -55,6 +55,13 @@ BASES: dict[str, dict] = {
                  "household income, scaled to the OECD equivalised scale via the US "
                  "anchor. OECD/EU coverage; not size-adjusted across countries.",
     },
+    "median_income_rural": {
+        "column": "rural_median_ppp_usd", "per_capita": False,
+        "label": "Rural median income (PPP)",
+        "blurb": "Median income outside the big cities — Europe: Eurostat rural areas "
+                 "(ilc_di17); US states: nonmetro counties (Census brackets). Directly "
+                 "measured, since medians can't be subtracted like GDP.",
+    },
 }
 
 

@@ -38,6 +38,18 @@ export const BASES = {
       "output per head. GDP/capita is extraction-skewed (Norway, North Dakota); this " +
       "is not. OECD/EU + US coverage; not size-adjusted across countries.",
   },
+  // The median-income "exclude cities" view: directly-measured median income outside
+  // the big cities — Europe via Eurostat rural areas (ilc_di17), US states via the
+  // nonmetro-county median. Reached via the toggle, not its own basis button.
+  median_income_rural: {
+    column: "rural_median_ppp_usd",
+    perCapita: false,
+    label: "Rural median income (PPP)",
+    blurb:
+      "Median income outside the big cities — Europe: Eurostat rural areas; US states: " +
+      "nonmetro counties. Directly measured (medians can't be subtracted). US rural " +
+      "trails its metros sharply; German/Austrian rural ≈ urban.",
+  },
 };
 
 // Value for one entity on a basis, or null when inputs are missing.

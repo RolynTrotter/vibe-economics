@@ -242,10 +242,15 @@ def load_entities() -> pd.DataFrame:
     df = load_processed(DATASET_ID)
     try:
         from .median_income import load_median_income
-        med = load_median_income()[["entity_id", "median_income_ppp_usd"]]
-        df = df.merge(med, on="entity_id", how="left")
+        med = load_median_income()
+        cols = [c for c in ("entity_id", "median_income_ppp_usd", "rural_median_ppp_usd")
+                if c in med.columns]
+        df = df.merge(med[cols], on="entity_id", how="left")
     except (FileNotFoundError, KeyError):
-        df["median_income_ppp_usd"] = float("nan")
+        pass
+    for c in ("median_income_ppp_usd", "rural_median_ppp_usd"):
+        if c not in df.columns:
+            df[c] = float("nan")
     return df
 
 

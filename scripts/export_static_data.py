@@ -61,9 +61,12 @@ def export_subnational_gdp() -> None:
     df = pd.read_parquet(ROOT / "data" / "processed" / "subnational_gdp.parquet")
     df = df.sort_values("gdp_nominal_usd", ascending=False)
     med_path = ROOT / "data" / "processed" / "median_income.parquet"
-    median = {}
+    median, rural_median = {}, {}
     if med_path.exists():
-        median = pd.read_parquet(med_path).set_index("entity_id")["median_income_ppp_usd"].to_dict()
+        mdf = pd.read_parquet(med_path).set_index("entity_id")
+        median = mdf["median_income_ppp_usd"].to_dict()
+        if "rural_median_ppp_usd" in mdf.columns:
+            rural_median = mdf["rural_median_ppp_usd"].dropna().to_dict()
     payload = {
         "dataset": "subnational_gdp",
         "sources": (
@@ -116,6 +119,7 @@ def export_subnational_gdp() -> None:
                 "gdp_ppp_usd": None if pd.isna(r.gdp_ppp_usd) else round(float(r.gdp_ppp_usd)),
                 "population": None if pd.isna(r.population) else round(float(r.population)),
                 "median_income_ppp_usd": None if r.entity_id not in median else round(float(median[r.entity_id])),
+                "rural_median_ppp_usd": None if r.entity_id not in rural_median else round(float(rural_median[r.entity_id])),
                 "year": int(r.year),
             }
             for r in df.itertuples()
