@@ -237,8 +237,16 @@ def compile_subnational_gdp(raw_dir: str | Path = RAW) -> pd.DataFrame:
 
 
 def load_entities() -> pd.DataFrame:
-    """Load the compiled comparison table (cached)."""
-    return load_processed(DATASET_ID)
+    """Load the compiled comparison table, with the median-income column merged in
+    (left join) when that dataset has been built — so the `median_income` basis works."""
+    df = load_processed(DATASET_ID)
+    try:
+        from .median_income import load_median_income
+        med = load_median_income()[["entity_id", "median_income_ppp_usd"]]
+        df = df.merge(med, on="entity_id", how="left")
+    except (FileNotFoundError, KeyError):
+        df["median_income_ppp_usd"] = float("nan")
+    return df
 
 
 def build() -> Path:

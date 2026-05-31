@@ -216,6 +216,28 @@ def test_richest_metro_and_three_way_fallback(country_places):
     assert {"New York (Greater)", "Washington (Greater)", "San Francisco (Greater)"} == names
 
 
+# --- median income basis (ticket 0007) -----------------------------------------
+def test_median_income_compiled_and_merged(df):
+    from app.services.subnational_gdp.median_income import load_median_income
+    med = load_median_income()
+    ids = set(med.entity_id)
+    assert {"US-CA", "USA", "NOR"} <= ids
+    assert med.entity_id.str.startswith("US-").sum() >= 50      # 50 states + DC
+    # load_entities merges the column so the basis resolves.
+    assert "median_income_ppp_usd" in df.columns
+    assert df.loc[df.entity_id == "US-CA", "median_income_ppp_usd"].notna().all()
+
+
+def test_median_income_extraction_contrast(df):
+    # The whole point: Norway's median income is far below its GDP-per-capita
+    # (oil rents inflate output, not the typical household).
+    t = model.ranked_table(df, "median_income")
+    assert t["value"].notna().all() and len(t) > 50
+    nor_med = t.loc[t.entity_id == "NOR", "value"].iloc[0]
+    nor_pc = model.basis_value(df, "per_capita")[df.entity_id == "NOR"].iloc[0]
+    assert nor_med < 0.7 * nor_pc
+
+
 def test_three_toggles_always_distinct_count(country_places):
     # Even where capital == largest == richest, three toggles remove three metros.
     for p in country_places:

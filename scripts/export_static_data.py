@@ -60,6 +60,10 @@ def export_jst_returns() -> None:
 def export_subnational_gdp() -> None:
     df = pd.read_parquet(ROOT / "data" / "processed" / "subnational_gdp.parquet")
     df = df.sort_values("gdp_nominal_usd", ascending=False)
+    med_path = ROOT / "data" / "processed" / "median_income.parquet"
+    median = {}
+    if med_path.exists():
+        median = pd.read_parquet(med_path).set_index("entity_id")["median_income_ppp_usd"].to_dict()
     payload = {
         "dataset": "subnational_gdp",
         "sources": (
@@ -81,8 +85,19 @@ def export_subnational_gdp() -> None:
                 "label": "GDP per capita (PPP)",
                 "blurb": "PPP GDP per person — a living-standards lens.",
             },
+            "median_income": {
+                "label": "Median income (PPP)",
+                "blurb": "Median disposable income — what a typical household lives "
+                         "on, not output per head. GDP/capita is extraction-skewed "
+                         "(Norway, North Dakota); this is not.",
+            },
         },
         "caveats": [
+            "Median income (PPP): countries use OECD median equivalised disposable "
+            "income ÷ World Bank consumption PPP; US states use Census median household "
+            "income scaled to the OECD scale via the US anchor. Comparable in level but "
+            "not size-adjusted across countries; OECD/EU coverage only (most non-OECD "
+            "have no median here).",
             "US-state PPP uses nominal USD as a proxy (US ≈ PPP reference economy; "
             "US PPP/nominal ≈ 1.01).",
             "State population is derived (personal income ÷ per-capita personal income).",
@@ -100,6 +115,7 @@ def export_subnational_gdp() -> None:
                 "gdp_nominal_usd": round(float(r.gdp_nominal_usd)),
                 "gdp_ppp_usd": None if pd.isna(r.gdp_ppp_usd) else round(float(r.gdp_ppp_usd)),
                 "population": None if pd.isna(r.population) else round(float(r.population)),
+                "median_income_ppp_usd": None if r.entity_id not in median else round(float(median[r.entity_id])),
                 "year": int(r.year),
             }
             for r in df.itertuples()
