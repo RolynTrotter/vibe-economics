@@ -1,7 +1,6 @@
 # Ticket 0008 — Metro punch-out / "hinterland" comparison
 
-**Status:** Phase 1 BUILT (country-level). Phase 2 (per-US-state) scoped below — needs
-a US county pipeline.
+**Status:** Phase 1 BUILT (country-level) · Phase 2 BUILT (per-US-state, CSA county footprint).
 **Service id:** `subnational_gdp` (extends it; new dataset `subnational_metros`)
 **Depends on:** OECD SDMX (key-free, allowlisted) + World Bank WDI.
 
@@ -35,14 +34,33 @@ average (Berlin is below the national mean) — a real, instructive effect.
   animates the reshuffle; each row shows the removed metros. `/api/subnational-gdp/hinterland`
   mirrors it; tests pin the US-robust / Europe-fragile result and the fallback rule.
 
-## Phase 2 — per-US-state punch-out (scoped, not built)
-Goal: also strip each **state's** own metro (Colorado − Denver; New York − *the NY part
-of the NYC metro*), so states and the hinterland-countries sit on one ladder.
+## Phase 2 — per-US-state punch-out (BUILT)
+Each **state** also strips its own metro (Colorado − Denver; New York − the NY part of the
+NYC metro), so states and hinterland-countries sit on one ladder.
 
-**The hard part — cross-border metros.** US FUAs/MSAs span state lines: NYC = NY+NJ+CT+PA,
-Washington = DC+VA+MD+WV, Chicago = IL+IN+WI. OECD's national-share figures don't
-decompose to states, and **OECD does not expose US FUA→county membership via its API**
-(`DF_LAU` returns no US records). So Phase 2 needs a US-specific pipeline:
+**What shipped** (`app/services/subnational_gdp/us_metros.py`, dataset `us_state_metros`):
+- **Footprint = Combined Statistical Area (CSA)**, CBSA fallback — the broad
+  commuting-zone definition, comparable to OECD's FUAs. The NY CSA pulls in the Hudson
+  Valley (Poughkeepsie/Newburgh), Bridgeport, etc., so NY State is stripped of a
+  comparably-big metro (NY-state slice $1.86T, 13.8M).
+- **Split across states by county:** BEA county GDP `CAGDP2` (place of work) and county
+  population `CAINC1` (residence) + Census/OMB 2023 CSA delineation. State totals are
+  county sums (so a metro's GDP share is exact and the hinterland is precisely the
+  non-metro counties). Cross-border commuters net out by construction.
+- States are modelled as `place` dicts identical in shape to countries, so the same
+  `select_removed_metros` / `hinterland_table` handle both; the ladder shows states +
+  countries + USA-whole, with the kind filter (states / countries / all).
+- **No-hinterland guard:** places left with < 12% of their population *or* GDP (New
+  Jersey, Rhode Island, Massachusetts, Connecticut, Maryland… — essentially all metro)
+  are dropped rather than shown as an unstable ratio. 43 of 51 states survive.
+- Capital-vs-largest per state mirrors the national rule (NY: Albany≠NYC → both removes
+  two; Colorado: Denver is capital *and* largest → fall back to Colorado Springs). Tests
+  pin the CSA footprint, the capital/largest split, and the combined ladder.
+
+**Known limitation / choice:** US states use the **CSA** footprint while countries use the
+**OECD FUA** — a deliberate, documented break. OECD doesn't expose US FUA→county membership
+via its API (`DF_LAU` returns no US records), so CSA is the closest broad proxy. For the
+record, a fully OECD-consistent US split would need:
 
 1. **County GDP** from BEA `CAGDP2` (county GDP, current $; the `BEA_API_KEY` works) and
    **county population** from BEA `CAINC1` — both already in reach.

@@ -86,68 +86,123 @@ def ranked_table(df: pd.DataFrame, basis: str, kinds: tuple[str, ...] | None = N
 # Metro punch-out ("hinterland" comparison) — ticket 0008
 # --------------------------------------------------------------------------- #
 def select_removed_metros(
-    country_metros: pd.DataFrame, remove_capital: bool, remove_largest: bool
+    metros: list[dict], remove_capital: bool, remove_largest: bool
 ) -> list[dict]:
-    """Which FUAs to punch out of one country, given the toggles.
+    """Which metros to punch out of one *place* (country or US state), per toggles.
 
-    `country_metros` is that country's metros sorted by GDP share (desc). Rules:
-    - remove_largest  -> the top-GDP metro.
+    `metros` is a list of metro dicts, each with ``code``, ``is_capital`` and
+    ``gdp_share_pct``. Rules:
+    - remove_largest  -> the top-GDP-share metro.
     - remove_capital  -> the capital metro.
-    - both, and they're the *same* metro (London, Paris, Tokyo) -> also drop the
-      next-largest, so two distinct metros come out.
+    - both, and they're the *same* metro (London, Paris, Tokyo; or a state whose
+      capital is its largest metro, e.g. Denver) -> also drop the next-largest, so
+      two distinct metros come out.
     """
-    rows = country_metros.sort_values("gdp_share_pct", ascending=False).to_dict("records")
+    rows = sorted(metros, key=lambda r: r["gdp_share_pct"], reverse=True)
     if not rows:
         return []
     chosen: dict[str, dict] = {}
     if remove_largest:
-        chosen[rows[0]["fua_code"]] = rows[0]
+        chosen[rows[0]["code"]] = rows[0]
     if remove_capital:
         cap = next((r for r in rows if r["is_capital"]), None)
         if cap is not None:
-            chosen[cap["fua_code"]] = cap
+            chosen[cap["code"]] = cap
     if remove_capital and remove_largest and len(chosen) < 2:
         for r in rows:                       # capital == largest: add next-largest
-            if r["fua_code"] not in chosen:
-                chosen[r["fua_code"]] = r
+            if r["code"] not in chosen:
+                chosen[r["code"]] = r
                 break
     return list(chosen.values())
 
 
+def country_places(metros: pd.DataFrame, names: dict[str, str] | None = None) -> list[dict]:
+    """Build hinterland `place` dicts (one per OECD country) from the FUA table."""
+    names = names or {}
+    places = []
+    for iso3, g in metros.groupby("country_iso3"):
+        first = g.iloc[0]
+        places.append({
+            "id": iso3, "name": names.get(iso3, iso3), "kind": "country",
+            "region": None,
+            "nat_gdp_nominal_usd": None if pd.isna(first["nat_gdp_nominal_usd"]) else float(first["nat_gdp_nominal_usd"]),
+            "nat_gdp_ppp_usd": float(first["nat_gdp_ppp_usd"]),
+            "nat_population": float(first["nat_population"]),
+            "year": int(first["year"]),
+            "metros": [
+                {"code": r.fua_code, "name": r.fua_name, "is_capital": bool(r.is_capital),
+                 "gdp_share_pct": float(r.gdp_share_pct),
+                 "population": None if pd.isna(r.fua_population) else float(r.fua_population)}
+                for r in g.itertuples()
+            ],
+        })
+    return places
+
+
+def state_places(us_metros: pd.DataFrame, entities: pd.DataFrame) -> list[dict]:
+    """Build hinterland `place` dicts (one per US state) from the CSA metro table.
+
+    State totals come from the entities table; each metro's GDP share is its in-state
+    county GDP (place of work) over state GDP, and its population is in-state county
+    population (residence) — so removing it nets out cross-border commuters.
+    """
+    ent = entities.set_index("entity_id")
+    places = []
+    for usps, g in us_metros.groupby("state_usps"):
+        eid = f"US-{usps}"
+        if eid not in ent.index:
+            continue
+        name = ent.loc[eid, "name"]
+        # State totals from the county series (consistent with in-state metro sums),
+        # so the GDP share is exact and the hinterland is exactly the non-metro counties.
+        state_gdp = float(g["state_total_gdp"].iloc[0])
+        state_pop = float(g["state_total_pop"].iloc[0])
+        places.append({
+            "id": eid, "name": name, "kind": "state", "region": "United States",
+            "nat_gdp_nominal_usd": state_gdp,
+            "nat_gdp_ppp_usd": state_gdp,  # US states: PPP ≈ nominal (US ≈ PPP base)
+            "nat_population": state_pop,
+            "year": int(g["year"].iloc[0]),
+            "metros": [
+                {"code": r.metro_id, "name": r.metro_name, "is_capital": bool(r.has_state_capital),
+                 "gdp_share_pct": float(r.in_state_gdp) / state_gdp * 100.0,
+                 "population": float(r.in_state_pop)}
+                for r in g.itertuples()
+            ],
+        })
+    return places
+
+
+# A place whose residual population/GDP after removal is below this fraction of the
+# whole is treated as having no meaningful hinterland (e.g. New Jersey or Rhode
+# Island — essentially all metro). Excluded rather than shown as an unstable ratio.
+MIN_RESIDUAL_FRACTION = 0.12
+
+
 def hinterland_table(
-    metros: pd.DataFrame,
-    basis: str,
-    remove_capital: bool,
-    remove_largest: bool,
-    names: dict[str, str] | None = None,
+    places: list[dict], basis: str, remove_capital: bool, remove_largest: bool
 ) -> pd.DataFrame:
-    """Country-level ladder with each country's selected metro(s) punched out.
+    """Ladder of `places` (countries and/or US states) with each one's selected
+    metro(s) punched out and the remainder recomputed on `basis`.
 
-    One row per OECD-covered country (incl. the USA as a whole). The carve-out uses
-    OECD's metro GDP-share-of-national for the GDP cut and the derived metro
-    population for the population cut, applied to World Bank national totals.
-
-    Columns: entity_id (ISO3), name, kind ("country"), parent, region, value, rank,
-    year, removed (list of metro names), removed_share (fraction of national GDP).
+    Carve-out: rest_gdp = national × (1 − Σ metro GDP shares); rest_pop = national_pop
+    − Σ metro populations. Places left with < MIN_RESIDUAL_FRACTION of their
+    population *or* GDP are dropped (no real hinterland). Columns: entity_id, name,
+    kind, region, value, rank, year, removed (metro names), removed_share.
     """
     if basis not in BASES:
         raise ValueError(f"Unknown basis '{basis}'. Options: {list(BASES)}")
-    names = names or {}
     rows = []
-    for iso3, g in metros.groupby("country_iso3"):
-        nat_nom = float(g["nat_gdp_nominal_usd"].iloc[0]) if pd.notna(g["nat_gdp_nominal_usd"].iloc[0]) else None
-        nat_ppp = float(g["nat_gdp_ppp_usd"].iloc[0])
-        nat_pop = float(g["nat_population"].iloc[0])
-        removed = select_removed_metros(g, remove_capital, remove_largest)
+    for p in places:
+        removed = select_removed_metros(p["metros"], remove_capital, remove_largest)
         share = sum(r["gdp_share_pct"] for r in removed) / 100.0
-        pop_removed = sum((r["fua_population"] or 0.0) for r in removed)
-        rest_pop = nat_pop - pop_removed
-        if rest_pop <= 0 or share >= 0.999:
+        pop_removed = sum((r["population"] or 0.0) for r in removed)
+        rest_pop = p["nat_population"] - pop_removed
+        if rest_pop <= MIN_RESIDUAL_FRACTION * p["nat_population"] or share >= 1 - MIN_RESIDUAL_FRACTION:
             continue
-        rest_nom = nat_nom * (1 - share) if nat_nom is not None else None
-        rest_ppp = nat_ppp * (1 - share)
+        rest_ppp = p["nat_gdp_ppp_usd"] * (1 - share)
         if basis == "nominal":
-            value = rest_nom
+            value = None if p["nat_gdp_nominal_usd"] is None else p["nat_gdp_nominal_usd"] * (1 - share)
         elif basis == "ppp":
             value = rest_ppp
         else:  # per_capita (PPP)
@@ -155,15 +210,9 @@ def hinterland_table(
         if value is None:
             continue
         rows.append({
-            "entity_id": iso3,
-            "name": names.get(iso3, iso3),
-            "kind": "country",
-            "parent": iso3,
-            "region": None,
-            "value": value,
-            "year": int(g["year"].iloc[0]),
-            "removed": [r["fua_name"] for r in removed],
-            "removed_share": share,
+            "entity_id": p["id"], "name": p["name"], "kind": p["kind"],
+            "region": p.get("region"), "value": value, "year": p["year"],
+            "removed": [r["name"] for r in removed], "removed_share": share,
         })
     out = pd.DataFrame(rows).sort_values("value", ascending=False).reset_index(drop=True)
     out["rank"] = np.arange(1, len(out) + 1)

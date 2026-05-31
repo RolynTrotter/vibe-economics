@@ -104,7 +104,7 @@ every other service: copy its shape (data loader → model → router → tests 
 |---|---------|--------|-------|--------|
 | 3 | Safe withdrawal backtester | [0003](docs/tickets/0003-safe-withdrawal-backtester.md) | #1 | **built (reference)** |
 | 2 | Subnational GDP comparison | [0002](docs/tickets/0002-subnational-gdp-comparison.md) | #3 | **built** (nominal/PPP/per-capita; median income → [0007](docs/tickets/0007-subnational-median-income-basis.md)) |
-| 2b | ↳ Metro punch-out / hinterlands | [0008](docs/tickets/0008-metro-punchout-hinterlands.md) | — | **built** (country-level OECD FUA; per-state phase 2 scoped) |
+| 2b | ↳ Metro punch-out / hinterlands | [0008](docs/tickets/0008-metro-punchout-hinterlands.md) | — | **built** (country-level OECD FUA + per-state CSA county footprint) |
 | 5 | Cost of living comparison | [0005](docs/tickets/0005-cost-of-living-comparison.md) | #2 | planned (flagship) |
 | 4 | Fed wealth & income trends | [0004](docs/tickets/0004-fed-wealth-income-trends.md) | #4 | planned |
 | 1 | Currency circulation crossover | [0001](docs/tickets/0001-currency-circulation.md) | #5 | planned |

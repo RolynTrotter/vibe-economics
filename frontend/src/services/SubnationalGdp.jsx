@@ -78,13 +78,13 @@ export default function SubnationalGdp() {
 
   const kinds = KINDS.find((k) => k.key === kindKey)?.kinds ?? null;
   const isPerCapita = basis === "per_capita";
-  const hinterland = (removeCapital || removeLargest) && data?.hinterland?.countries?.length;
+  const hinterland = (removeCapital || removeLargest) && data?.hinterland?.places?.length;
 
   const table = useMemo(() => {
     if (!data) return [];
     if (removeCapital || removeLargest) {
-      if (!data.hinterland?.countries?.length) return [];
-      return m.hinterlandTable(data.hinterland.countries, basis, removeCapital, removeLargest);
+      if (!data.hinterland?.places?.length) return [];
+      return m.hinterlandTable(data.hinterland.places, basis, removeCapital, removeLargest, kinds);
     }
     return m.rankedTable(data.entities, basis, kinds);
   }, [data, basis, kindKey, removeCapital, removeLargest]);
@@ -145,15 +145,13 @@ export default function SubnationalGdp() {
           <div className="footnote" style={{ marginTop: 8 }}>{basisSpec?.blurb}</div>
         </div>
 
-        {!hinterland && (
-          <div className="seg">
-            {KINDS.map((k) => (
-              <button key={k.key} className={kindKey === k.key ? "active" : ""} onClick={() => setKindKey(k.key)}>
-                {k.label}
-              </button>
-            ))}
-          </div>
-        )}
+        <div className="seg">
+          {KINDS.map((k) => (
+            <button key={k.key} className={kindKey === k.key ? "active" : ""} onClick={() => setKindKey(k.key)}>
+              {k.label}
+            </button>
+          ))}
+        </div>
 
         <div>
           <div className="footnote" style={{ marginBottom: 6 }}>
@@ -171,8 +169,9 @@ export default function SubnationalGdp() {
             <div className="footnote" style={{ marginTop: 8 }}>
               Hinterland view: each economy minus its{" "}
               {removeCapital && removeLargest ? "capital and largest" : removeCapital ? "capital" : "largest"}{" "}
-              metro, recomputed on what’s left. Non-OECD countries and US states are
-              hidden here.
+              metro, recomputed on what’s left. US states (CSA footprint, by county) sit
+              alongside OECD countries (FUA). Non-OECD countries and places that are
+              essentially all-metro (e.g. New Jersey) are hidden.
             </div>
           )}
         </div>
@@ -276,7 +275,7 @@ export default function SubnationalGdp() {
               {LEGEND.map(([label, c]) => (
                 <span key={label} className="legend-item">
                   <span className="swatch" style={{ background: c }} />
-                  {label === "US states" && hinterland ? "United States" : label}
+                  {label}
                 </span>
               ))}
             </div>

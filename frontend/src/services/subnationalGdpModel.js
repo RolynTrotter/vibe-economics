@@ -78,28 +78,33 @@ export function selectRemovedMetros(metros, removeCapital, removeLargest) {
   return [...chosen.values()];
 }
 
-// Country-level ladder with each country's selected metro(s) punched out.
-// `countries` is the hinterland block from the snapshot.
-export function hinterlandTable(countries, basis, removeCapital, removeLargest) {
+// A place whose residual after removal is below this fraction of the whole has no
+// meaningful hinterland (e.g. New Jersey) — dropped rather than shown unstable.
+export const MIN_RESIDUAL_FRACTION = 0.12;
+
+// Ladder of `places` (countries and/or US states) with each one's selected metro(s)
+// punched out. Mirrors model.hinterland_table. `kinds` optionally filters by kind.
+export function hinterlandTable(places, basis, removeCapital, removeLargest, kinds = null) {
   const spec = BASES[basis];
   if (!spec) throw new Error(`Unknown basis '${basis}'`);
   const rows = [];
-  for (const c of countries) {
-    const removed = selectRemovedMetros(c.metros, removeCapital, removeLargest);
+  for (const p of places) {
+    if (kinds && !kinds.includes(p.kind)) continue;
+    const removed = selectRemovedMetros(p.metros, removeCapital, removeLargest);
     const share = removed.reduce((s, r) => s + r.gdp_share_pct, 0) / 100;
     const popRemoved = removed.reduce((s, r) => s + (r.population || 0), 0);
-    const restPop = c.nat_population - popRemoved;
-    if (restPop <= 0 || share >= 0.999) continue;
-    const restNom = c.nat_gdp_nominal_usd != null ? c.nat_gdp_nominal_usd * (1 - share) : null;
-    const restPpp = c.nat_gdp_ppp_usd * (1 - share);
+    const restPop = p.nat_population - popRemoved;
+    if (restPop <= MIN_RESIDUAL_FRACTION * p.nat_population || share >= 1 - MIN_RESIDUAL_FRACTION) continue;
+    const restNom = p.nat_gdp_nominal_usd != null ? p.nat_gdp_nominal_usd * (1 - share) : null;
+    const restPpp = p.nat_gdp_ppp_usd * (1 - share);
     let value;
     if (basis === "nominal") value = restNom;
     else if (basis === "ppp") value = restPpp;
     else value = restPpp / restPop;
     if (value == null) continue;
     rows.push({
-      id: c.iso3, entity_id: c.iso3, name: c.name, kind: "country",
-      parent: c.iso3, region: c.region, value, year: c.year,
+      id: p.id, entity_id: p.id, name: p.name, kind: p.kind,
+      parent: p.kind === "state" ? "USA" : p.id, region: p.region, value, year: p.year,
       removed: removed.map((r) => r.name), removed_share: share,
     });
   }

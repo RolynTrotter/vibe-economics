@@ -81,26 +81,29 @@ def hinterland(
     basis: str = Query("per_capita"),
     remove_capital: bool = Query(False),
     remove_largest: bool = Query(False),
+    include: str = Query("all", description="all | states | countries"),
 ) -> dict:
-    """Country-level ladder (OECD coverage) with each country's capital and/or
-    largest metro punched out and the remainder recomputed — the 'hinterland' view."""
+    """Ladder of countries (OECD FUA) and/or US states (CSA county footprint) with
+    each place's capital and/or largest metro punched out — the 'hinterland' view."""
     from .metros import load_metros
+    from .us_metros import load_us_metros
 
     df = load_entities()
     names = {r.entity_id: r.name for r in df[df["kind"] == "country"].itertuples()}
     names["USA"] = "United States"
+    places = []
+    if include in ("all", "countries"):
+        places += model.country_places(load_metros(), names)
+    if include in ("all", "states"):
+        places += model.state_places(load_us_metros(), df)
     try:
-        table = model.hinterland_table(
-            load_metros(), basis, remove_capital, remove_largest, names
-        )
+        table = model.hinterland_table(places, basis, remove_capital, remove_largest)
     except ValueError as exc:
         raise HTTPException(400, str(exc))
     return {
-        "basis": basis,
-        "remove_capital": remove_capital,
-        "remove_largest": remove_largest,
-        "n": len(table),
-        "rows": table.to_dict(orient="records"),
+        "basis": basis, "remove_capital": remove_capital,
+        "remove_largest": remove_largest, "include": include,
+        "n": len(table), "rows": table.to_dict(orient="records"),
     }
 
 

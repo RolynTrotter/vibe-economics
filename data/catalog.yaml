@@ -98,6 +98,24 @@ datasets:
       out" a metro from its country), PPP GDP, and derived population. Powers the
       hinterland comparison (ticket 0008). Coverage is OECD/EU only.
 
+  us_state_metros:
+    title: "US metros by state (CSA-first footprint; in-state county GDP & population) — per-state metro punch-out"
+    source: "Census/OMB 2023 CBSA/CSA delineation + BEA county GDP (CAGDP2) & population (CAINC1)"
+    homepage: "https://www.census.gov/programs-surveys/metro-micro.html"
+    url: "https://www2.census.gov/programs-surveys/metro-micro/geographies/reference-files/2023/delineation-files/list1_2023.xlsx"
+    license: "U.S. Government work, public domain (Census + BEA)."
+    api_key: "BEA_API_KEY"
+    raw: "us_state_metros/"
+    processed: "us_state_metros.parquet"
+    compiler: "app.services.subnational_gdp.us_metros:compile_us_metros"
+    notes: >
+      Multi-call acquisition; build via:
+      python -m app.services.subnational_gdp.us_metros build.
+      Metro footprint = Combined Statistical Area (broad commuting zone; captures the
+      Hudson Valley etc.), CBSA fallback. Split across states by county GDP (place of
+      work) and county population (residence). Powers phase 2 of ticket 0008; see
+      docs/tickets/0008-metro-allocation-analysis.md.
+
   damodaran_histret:
     title: "Historical Returns on Stocks, Bonds and Bills - United States"
     source: "Aswath Damodaran, NYU Stern"
