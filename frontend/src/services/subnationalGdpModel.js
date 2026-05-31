@@ -65,11 +65,27 @@ export function basisValue(e, basis) {
   return v;
 }
 
+// Which per-field estimated flags feed each basis (mirrors model._BASIS_ESTIMATED_FLAGS).
+// A value is "estimated" if any input it depends on was imputed for the chosen year.
+const BASIS_ESTIMATED_FLAGS = {
+  nominal: ["gdp_nominal_usd_estimated"],
+  ppp: ["gdp_ppp_usd_estimated"],
+  per_capita: ["gdp_ppp_usd_estimated", "population_estimated"],
+  median_income: ["median_income_estimated"],
+  median_income_rural: ["rural_median_estimated"],
+};
+
+// True if `basis`'s value for entity `e` was interpolated/extrapolated for the year.
+// (Flags are omitted from the JSON when false, so a missing key reads as not estimated.)
+export function basisEstimated(e, basis) {
+  return (BASIS_ESTIMATED_FLAGS[basis] || []).some((f) => !!e[f]);
+}
+
 // All entities sorted desc by basis, with a dense 1-based rank. `kinds` optionally
 // filters to e.g. ["state","country"]. Entities with no value on the basis drop out.
 export function rankedTable(entities, basis, kinds = null) {
   let rows = entities
-    .map((e) => ({ ...e, value: basisValue(e, basis) }))
+    .map((e) => ({ ...e, value: basisValue(e, basis), estimated: basisEstimated(e, basis) }))
     .filter((e) => e.value != null);
   if (basis === "per_capita") rows = rows.filter((e) => !PER_CAPITA_EXCLUDE.has(e.id || e.entity_id));
   if (kinds) rows = rows.filter((e) => kinds.includes(e.kind));

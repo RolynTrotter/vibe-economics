@@ -74,10 +74,29 @@ export default function SubnationalGdp() {
   const [removeLargest, setRemoveLargest] = useState(false);
   const [removeRichest, setRemoveRichest] = useState(false);
   const [excludeCities, setExcludeCities] = useState(false);
+  const [year, setYear] = useState(null);
 
   useEffect(() => {
-    loadDataset("subnational_gdp").then(setData).catch((e) => setError(e.message));
+    loadDataset("subnational_gdp")
+      .then((d) => {
+        setData(d);
+        setYear(d.years?.default ?? null);
+      })
+      .catch((e) => setError(e.message));
   }, []);
+
+  // The year the table is aligned to (slider value, falling back to the dataset default).
+  const yearMeta = data?.years ?? null;
+  const effYear = year ?? yearMeta?.default ?? null;
+  // Per-year entity table (smoothed/imputed in Python, exported per year), or the
+  // latest snapshot for older static files without `by_year`.
+  const yearEntities = useMemo(() => {
+    if (!data) return [];
+    if (data.by_year && effYear != null && data.by_year[String(effYear)]) {
+      return data.by_year[String(effYear)];
+    }
+    return data.entities || [];
+  }, [data, effYear]);
 
   const kinds = KINDS.find((k) => k.key === kindKey)?.kinds ?? null;
   const isMedian = basis === "median_income";
@@ -96,8 +115,9 @@ export default function SubnationalGdp() {
       if (!data.hinterland?.places?.length) return [];
       return m.hinterlandTable(data.hinterland.places, basis, removeCapital, removeLargest, removeRichest, kinds);
     }
-    return m.rankedTable(data.entities, effectiveBasis, kinds);
-  }, [data, effectiveBasis, kindKey, removeCapital, removeLargest, removeRichest, punchout, basis]);
+    return m.rankedTable(yearEntities, effectiveBasis, kinds);
+  }, [data, yearEntities, effectiveBasis, kindKey, removeCapital, removeLargest, removeRichest, punchout, basis]);
+  const nEstimated = useMemo(() => (punchout ? 0 : table.filter((e) => e.estimated).length), [table, punchout]);
 
   const q = query.trim().toLowerCase();
   const filtered = useMemo(
@@ -109,12 +129,12 @@ export default function SubnationalGdp() {
   const maxValue = table.length ? table[0].value : 1; // global max for bar scaling
 
   const states = useMemo(
-    () => (data ? data.entities.filter((e) => e.kind === "state").sort((a, b) => a.name.localeCompare(b.name)) : []),
+    () => (data ? (data.entities || []).filter((e) => e.kind === "state").sort((a, b) => a.name.localeCompare(b.name)) : []),
     [data]
   );
   const match = useMemo(
-    () => (data ? m.nearest(data.entities, matchState, effectiveBasis, 3, "country") : null),
-    [data, matchState, effectiveBasis]
+    () => (data ? m.nearest(yearEntities, matchState, effectiveBasis, 3, "country") : null),
+    [data, yearEntities, matchState, effectiveBasis]
   );
 
   // ---- FLIP: animate rows from their previous position to the new one. ----
@@ -136,13 +156,42 @@ export default function SubnationalGdp() {
       }
     });
     prevPos.current = newPos;
-  }, [basis, kindKey, visible.length, q, removeCapital, removeLargest]);
+  }, [basis, kindKey, visible.length, q, removeCapital, removeLargest, effYear]);
 
   const basisSpec = m.BASES[effectiveBasis];
+  // Value string with a trailing asterisk when the figure was interpolated/extrapolated.
+  const fmtVal = (e) => {
+    const s = smallVal ? fmtPerCapita(e.value) : fmtUSD(e.value);
+    return e.estimated ? `${s}*` : s;
+  };
 
   return (
     <div>
       <div className="panel controls">
+        {yearMeta && (
+          <div>
+            <div className="footnote" style={{ marginBottom: 6, display: "flex", justifyContent: "space-between" }}>
+              <span>Align all places to year</span>
+              <strong style={{ fontVariantNumeric: "tabular-nums" }}>{effYear}</strong>
+            </div>
+            <input
+              type="range"
+              min={yearMeta.min}
+              max={yearMeta.max}
+              step={1}
+              value={effYear ?? yearMeta.max}
+              disabled={punchout}
+              onChange={(e) => setYear(Number(e.target.value))}
+              style={{ width: "100%" }}
+              aria-label="Year"
+            />
+            <div className="footnote" style={{ marginTop: 4 }}>
+              {punchout
+                ? "Metro punch-out uses the latest-vintage data; the year slider doesn’t apply here."
+                : `Sources lag differently, so figures past a source’s latest release are interpolated or carried forward (IMF growth) and marked *. ${nEstimated} of ${table.length} shown are estimated.`}
+            </div>
+          </div>
+        )}
         <div>
           <div className="footnote" style={{ marginBottom: 6 }}>Rank by</div>
           <div className="seg">
@@ -242,10 +291,8 @@ export default function SubnationalGdp() {
               <div className="match-row">
                 <div className="match-target" style={{ borderColor: USA_BLUE }}>
                   <div className="label">{match.entity.name}</div>
-                  <div className="value">
-                    {smallVal ? fmtPerCapita(match.entity.value) : fmtUSD(match.entity.value)}
-                  </div>
-                  <div className="sub">#{match.entity.rank} overall · {match.entity.year}</div>
+                  <div className="value">{fmtVal(match.entity)}</div>
+                  <div className="sub">#{match.entity.rank} overall · {effYear}</div>
                 </div>
                 <div className="match-approx">≈</div>
                 <div className="match-countries">
@@ -253,7 +300,7 @@ export default function SubnationalGdp() {
                     <div key={n.id} className="match-country">
                       <span className="swatch" style={{ background: regionColor(n.region) }} />
                       <span className="cname">{n.name}</span>
-                      <span className="cval">{smallVal ? fmtPerCapita(n.value) : fmtUSD(n.value)}</span>
+                      <span className="cval">{fmtVal(n)}</span>
                     </div>
                   ))}
                 </div>
@@ -301,7 +348,10 @@ export default function SubnationalGdp() {
                     <span className="lbar-wrap">
                       <span className="lbar" style={{ width: `${w}%`, background: color }} />
                     </span>
-                    <span className="lval">{smallVal ? fmtPerCapita(e.value) : fmtUSD(e.value)}</span>
+                    <span className={`lval${e.estimated ? " lval-est" : ""}`}
+                          title={e.estimated ? `Estimated for ${effYear} (interpolated or carried forward)` : undefined}>
+                      {fmtVal(e)}
+                    </span>
                   </div>
                 );
               })}
@@ -320,7 +370,16 @@ export default function SubnationalGdp() {
               ))}
             </div>
             <div className="footnote" style={{ marginTop: 6 }}>
-              Bars are √-scaled for legibility; the figure on the right is the actual value.
+              Bars are √-scaled for legibility; the figure on the right is the value.
+              {!hinterland && (
+                <>
+                  {" "}An asterisk (*) marks a figure <strong>estimated for {effYear}</strong>:
+                  either interpolated between two releases, or the latest actual carried
+                  forward (≤2 yrs) using IMF growth. A place with no data within ~2 years of
+                  {" "}{effYear} drops out rather than being invented.
+                  {nEstimated > 0 ? ` Here, ${nEstimated} of ${table.length} are estimated.` : ""}
+                </>
+              )}
               {hinterland ? ` ${data.hinterland.note}` : ""}
             </div>
           </div>
@@ -329,6 +388,22 @@ export default function SubnationalGdp() {
             <details className="methodology">
               <summary>Data sources &amp; methodology</summary>
               <div className="method-body">
+                <p><strong>Same-year alignment (the year slider)</strong><br />
+                Sources release on different clocks — BEA publishes a preliminary US-state
+                figure for the current year while the World Bank’s country GDP often stops
+                one or two years back. The slider pins every place to one chosen year and
+                fills the gaps per metric (nominal GDP, PPP GDP, population) independently:
+                an observed value is used as-is; a year between two observations is
+                interpolated log-linearly (constant growth); a year up to two years past
+                the last observation is carried forward by IMF WEO year-on-year growth
+                (or the place’s own recent CAGR if the IMF lacks it). Anything filled this
+                way is marked <strong>*</strong>. A place whose data ends more than ~2 years
+                before the chosen year is dropped for that year rather than invented — so a
+                country with nothing since 2021 won’t appear at 2025, but one with 2025
+                nominal GDP, 2024 population and a 2023 median can still be assembled.
+                Median income is carried from its own vintage to the chosen year by
+                PPP-per-capita growth.</p>
+
                 <p><strong>Total GDP (nominal / PPP)</strong><br />
                 Countries: World Bank WDI 2024 — nominal at market exchange rates; PPP via
                 World Bank conversion factors. US states: BEA Regional 2025 (preliminary) —

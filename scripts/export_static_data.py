@@ -57,23 +57,72 @@ def export_jst_returns() -> None:
     print(f"wrote {len(payload['rows'])} rows -> {out.relative_to(ROOT)}")
 
 
+def _i(v):
+    """Round to int, or None for missing."""
+    return None if v is None or (isinstance(v, float) and pd.isna(v)) else round(float(v))
+
+
+def _entity_row(r) -> dict:
+    """One per-year entity row for the widget, with per-field estimated flags.
+    Flag keys mirror model.basis_estimated so subnationalGdpModel.js stays a 1:1 port.
+    Null values and false (0) flags are omitted to keep the JSON small — the JS model
+    treats a missing field as absent/false."""
+    row = {
+        "id": r.entity_id, "name": r.name, "kind": r.kind,
+        "parent": r.parent, "region": r.region, "year": int(r.year),
+    }
+    vals = {
+        "gdp_nominal_usd": _i(r.gdp_nominal_usd),
+        "gdp_ppp_usd": _i(r.gdp_ppp_usd),
+        "population": _i(r.population),
+        "median_income_ppp_usd": _i(getattr(r, "median_income_ppp_usd", None)),
+        "rural_median_ppp_usd": _i(getattr(r, "rural_median_ppp_usd", None)),
+    }
+    for k, v in vals.items():
+        if v is not None:
+            row[k] = v
+    mi_year = getattr(r, "median_income_year", None)
+    if mi_year is not None and not pd.isna(mi_year):
+        row["median_income_year"] = int(mi_year)
+    # estimated flags — emit only the truthy ones (== 1).
+    for flag in ("gdp_nominal_usd_estimated", "gdp_ppp_usd_estimated", "population_estimated",
+                 "median_income_estimated", "rural_median_estimated"):
+        if bool(getattr(r, flag, False)):
+            row[flag] = 1
+    return row
+
+
 def export_subnational_gdp() -> None:
-    df = pd.read_parquet(ROOT / "data" / "processed" / "subnational_gdp.parquet")
-    df = df.sort_values("gdp_nominal_usd", ascending=False)
+    import sys
+    sys.path.insert(0, str(ROOT / "backend"))
+    from app.services.subnational_gdp import estimate
+
+    snapshot = pd.read_parquet(ROOT / "data" / "processed" / "subnational_gdp.parquet")
+    snapshot = snapshot.sort_values("gdp_nominal_usd", ascending=False)
+
+    ts = estimate.load_timeseries()
+    median_df = None
     med_path = ROOT / "data" / "processed" / "median_income.parquet"
-    median, rural_median, mi_years = {}, {}, {}
     if med_path.exists():
-        mdf = pd.read_parquet(med_path).set_index("entity_id")
-        median = mdf["median_income_ppp_usd"].to_dict()
-        mi_years = mdf["year"].to_dict()
-        if "rural_median_ppp_usd" in mdf.columns:
-            rural_median = mdf["rural_median_ppp_usd"].dropna().to_dict()
+        median_df = pd.read_parquet(med_path)
+    lo, hi = estimate.available_years(ts)
+
+    by_year: dict[str, list[dict]] = {}
+    for year in range(lo, hi + 1):
+        edf = estimate.entities_for_year(ts, year, median_df)
+        # keep only places with something to show on at least one basis
+        keep = edf[["gdp_nominal_usd", "gdp_ppp_usd", "population",
+                    "median_income_ppp_usd"]].notna().any(axis=1)
+        edf = edf[keep]
+        by_year[str(year)] = [_entity_row(r) for r in edf.itertuples()]
+
     payload = {
         "dataset": "subnational_gdp",
         "sources": (
             "BEA Regional (US state GDP; population derived from personal income / "
             "per-capita personal income; public domain) + World Bank WDI (country "
-            "GDP, GDP PPP, population; CC BY 4.0)."
+            "GDP, GDP PPP, population; CC BY 4.0) + IMF DataMapper/WEO (near-term "
+            "growth for casting the latest actual to the chosen year)."
         ),
         "bases": {
             "nominal": {
@@ -96,44 +145,40 @@ def export_subnational_gdp() -> None:
                          "(Norway, North Dakota); this is not.",
             },
         },
+        "years": {"min": lo, "max": hi, "default": hi, "list": list(range(lo, hi + 1))},
         "caveats": [
+            "Year alignment: every place is shown at the chosen year. A figure released "
+            "later than the year (or interpolated between two releases) is marked with an "
+            "asterisk (*) — interpolated between actuals, or carried ≤2 years past the "
+            "latest actual using IMF WEO growth. Places with no data within ~2 years of "
+            "the chosen year drop out rather than be invented.",
             "Median income (PPP): countries use OECD median equivalised disposable "
             "income ÷ World Bank consumption PPP; US states use Census median household "
-            "income scaled to the OECD scale via the US anchor. Comparable in level but "
-            "not size-adjusted across countries; OECD/EU coverage only (most non-OECD "
-            "have no median here).",
+            "income scaled to the OECD scale via the US anchor. Carried to other years by "
+            "PPP-per-capita growth. Comparable in level but not size-adjusted across "
+            "countries; OECD/EU coverage only (most non-OECD have no median here).",
             "US-state PPP uses nominal USD as a proxy (US ≈ PPP reference economy; "
             "US PPP/nominal ≈ 1.01).",
             "State population is derived (personal income ÷ per-capita personal income).",
             "DC is excluded from the per-capita ranking: its GDP-per-capita is a "
             "commuter artifact (metro-wide output divided by DC residents only).",
-            "Release lags differ by source; each place carries the year of its GDP figure.",
+            "Metro punch-out (hinterland) uses the latest-vintage snapshot, not the "
+            "year slider.",
         ],
-        "entities": [
-            {
-                "id": r.entity_id,
-                "name": r.name,
-                "kind": r.kind,
-                "parent": r.parent,
-                "region": r.region,
-                "gdp_nominal_usd": round(float(r.gdp_nominal_usd)),
-                "gdp_ppp_usd": None if pd.isna(r.gdp_ppp_usd) else round(float(r.gdp_ppp_usd)),
-                "population": None if pd.isna(r.population) else round(float(r.population)),
-                "median_income_ppp_usd": None if r.entity_id not in median else round(float(median[r.entity_id])),
-                "median_income_year": None if r.entity_id not in mi_years else int(mi_years[r.entity_id]),
-                "rural_median_ppp_usd": None if r.entity_id not in rural_median else round(float(rural_median[r.entity_id])),
-                "year": int(r.year),
-            }
-            for r in df.itertuples()
-        ],
+        # default-year entities kept as `entities` for the matcher's state list and any
+        # consumer that ignores the slider.
+        "entities": by_year[str(hi)],
+        "by_year": by_year,
     }
-    payload["hinterland"] = _build_hinterland(df)
+    payload["hinterland"] = _build_hinterland(snapshot)
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     out = OUT_DIR / "subnational_gdp.json"
     out.write_text(json.dumps(payload, separators=(",", ":")))
+    size_mb = out.stat().st_size / 1e6
     nh = len(payload["hinterland"]["places"]) if payload["hinterland"] else 0
-    print(f"wrote {len(payload['entities'])} entities + {nh} hinterland places -> {out.relative_to(ROOT)}")
+    print(f"wrote {len(by_year)} years × ~{len(payload['entities'])} entities "
+          f"+ {nh} hinterland places -> {out.relative_to(ROOT)} ({size_mb:.2f} MB)")
 
 
 def _round_place(p: dict) -> dict:
