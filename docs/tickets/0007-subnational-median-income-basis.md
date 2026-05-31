@@ -4,6 +4,15 @@
 equivalised disposable income ÷ World Bank consumption PPP. US states: Census ACS
 median household income, anchored to the OECD equivalised scale via the US ratio.
 Added as the `median_income` basis; metro punch-out is hidden on it (GDP-only tool).
+
+**Plus an "exclude cities" / rural-median view** (the median analog of the metro
+punch-out — medians can't be subtracted, so this is *directly measured*): Europe uses
+Eurostat median income by degree of urbanisation (`ilc_di17` rural ÷ `ilc_di03`
+national, both PPS) to scale each country's figure; US states use the nonmetro-county
+median (Census `B19001` brackets, interpolated, ≥20k-household floor) × the US anchor.
+Surfaced as the `median_income_rural` basis behind an "Outside the cities" toggle. 75
+entities. Finding: US metros carry the median hard (California rural ≈ Belgium, ~0.71×
+the state median) while German/Austrian rural ≈ or > urban.
 **Service id:** `subnational_gdp` (extends the built service)
 **Depends on:** [0006 — data-access wishlist](0006-data-access-wishlist.md) — specifically a
 **working `CENSUS_API_KEY`** (the env var currently exists but is blank) plus Eurostat

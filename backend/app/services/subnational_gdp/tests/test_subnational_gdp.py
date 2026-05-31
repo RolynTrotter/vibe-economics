@@ -238,6 +238,18 @@ def test_median_income_extraction_contrast(df):
     assert nor_med < 0.7 * nor_pc
 
 
+def test_rural_median_exclude_cities(df):
+    # "Exclude cities" rural median (Eurostat rural / US nonmetro). US metros carry the
+    # median, so US-state rural trails its overall median; German rural ≈ urban.
+    t = model.ranked_table(df, "median_income_rural")
+    assert t["value"].notna().all() and len(t) >= 50
+    full = model.ranked_table(df, "median_income").set_index("entity_id")["value"]
+    ca_rural = t.loc[t.entity_id == "US-CA", "value"].iloc[0]
+    assert ca_rural < 0.85 * full["US-CA"]          # CA rural well below state median
+    deu_rural = t.loc[t.entity_id == "DEU", "value"].iloc[0]
+    assert deu_rural > 0.95 * full["DEU"]           # German rural ≈ national
+
+
 def test_three_toggles_always_distinct_count(country_places):
     # Even where capital == largest == richest, three toggles remove three metros.
     for p in country_places:
