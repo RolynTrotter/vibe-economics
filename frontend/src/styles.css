@@ -151,7 +151,7 @@ a { color: var(--accent); }
   font-size: 0.78rem;
   font-variant-numeric: tabular-nums;
 }
-.lname { flex: 0 0 38%; font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lname { flex: 0 0 46%; font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lbar-wrap { flex: 1 1 auto; height: 12px; background: #161d36; border-radius: 6px; overflow: hidden; }
 .lbar { display: block; height: 100%; border-radius: 6px; }
 .lval {
@@ -174,3 +174,5 @@ a { color: var(--accent); }
 .legend { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 12px; }
 .legend-item { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 0.72rem; }
 .swatch { width: 11px; height: 11px; border-radius: 3px; display: inline-block; flex: 0 0 auto; }
+
+.lremoved { color: var(--muted); font-size: 0.72rem; font-style: italic; }

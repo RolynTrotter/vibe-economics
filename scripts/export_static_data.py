@@ -105,10 +105,66 @@ def export_subnational_gdp() -> None:
             for r in df.itertuples()
         ],
     }
+    payload["hinterland"] = _build_hinterland(df)
+
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     out = OUT_DIR / "subnational_gdp.json"
     out.write_text(json.dumps(payload, separators=(",", ":")))
-    print(f"wrote {len(payload['entities'])} entities -> {out.relative_to(ROOT)}")
+    nh = len(payload["hinterland"]["places"]) if payload["hinterland"] else 0
+    print(f"wrote {len(payload['entities'])} entities + {nh} hinterland places -> {out.relative_to(ROOT)}")
+
+
+def _round_place(p: dict) -> dict:
+    """JSON-serialise a model place dict (round floats, keep keys the JS expects)."""
+    return {
+        "id": p["id"], "name": p["name"], "kind": p["kind"], "region": p["region"],
+        "nat_gdp_nominal_usd": None if p["nat_gdp_nominal_usd"] is None else round(p["nat_gdp_nominal_usd"]),
+        "nat_gdp_ppp_usd": round(p["nat_gdp_ppp_usd"]),
+        "nat_population": round(p["nat_population"]),
+        "year": p["year"],
+        "metros": [
+            {"code": m["code"], "name": m["name"], "is_capital": m["is_capital"],
+             "gdp_share_pct": round(m["gdp_share_pct"], 3),
+             "population": None if m["population"] is None else round(m["population"])}
+            for m in p["metros"]
+        ],
+    }
+
+
+def _build_hinterland(entities_df: pd.DataFrame) -> dict:
+    """Metro punch-out block (ticket 0008): per place (OECD country + US state), its
+    totals + metros, so the widget subtracts the capital/largest metro client-side."""
+    import sys
+    sys.path.insert(0, str(ROOT / "backend"))
+    from app.services.subnational_gdp import model
+
+    proc = ROOT / "data" / "processed"
+    places = []
+    if (proc / "subnational_metros.parquet").exists():
+        names = {r.entity_id: r.name for r in entities_df[entities_df.kind == "country"].itertuples()}
+        names["USA"] = "United States"
+        cp = model.country_places(pd.read_parquet(proc / "subnational_metros.parquet"), names)
+        # carry region onto countries for colouring
+        regions = {r.entity_id: r.region for r in entities_df[entities_df.kind == "country"].itertuples()}
+        regions["USA"] = "United States"
+        for p in cp:
+            p["region"] = regions.get(p["id"])
+        places += cp
+    if (proc / "us_state_metros.parquet").exists():
+        places += model.state_places(pd.read_parquet(proc / "us_state_metros.parquet"), entities_df)
+
+    places = [_round_place(p) for p in places]
+    places.sort(key=lambda p: p["nat_gdp_ppp_usd"], reverse=True)
+    return {
+        "source": "OECD Functional Urban Areas (countries) + Census/OMB CSA + BEA county "
+                  "GDP/population (US states). National totals: World Bank WDI / BEA.",
+        "note": "Each place's capital and/or largest metro can be removed and values "
+                "recomputed on the remaining hinterland. Countries: OECD FUA share of "
+                "national GDP (OECD/EU coverage only). US states: in-state county GDP "
+                "(place of work) over the metro's CSA footprint, population netted by "
+                "residence. Places left with little residual (e.g. New Jersey) are hidden.",
+        "places": places,
+    }
 
 
 if __name__ == "__main__":
