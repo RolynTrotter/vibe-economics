@@ -77,6 +77,28 @@ def basis_value(df: pd.DataFrame, basis: str) -> pd.Series:
     return col
 
 
+# Which per-field estimated flags (set by estimate.entities_for_year) feed each basis.
+# A basis value is "estimated" if any input it depends on was imputed for the year.
+_BASIS_ESTIMATED_FLAGS: dict[str, tuple[str, ...]] = {
+    "nominal": ("gdp_nominal_usd_estimated",),
+    "ppp": ("gdp_ppp_usd_estimated",),
+    "per_capita": ("gdp_ppp_usd_estimated", "population_estimated"),
+    "median_income": ("median_income_estimated",),
+    "median_income_rural": ("rural_median_estimated",),
+}
+
+
+def basis_estimated(df: pd.DataFrame, basis: str) -> pd.Series:
+    """Boolean per row: is `basis`'s value imputed for this year? (False if the frame
+    carries no estimated flags, i.e. the latest-snapshot path.)"""
+    flags = _BASIS_ESTIMATED_FLAGS.get(basis, ())
+    out = pd.Series(False, index=df.index)
+    for col in flags:
+        if col in df.columns:
+            out = out | df[col].fillna(False).astype(bool)
+    return out
+
+
 def ranked_table(df: pd.DataFrame, basis: str, kinds: tuple[str, ...] | None = None) -> pd.DataFrame:
     """All entities sorted desc by `basis`, with a dense 1-based rank.
 
@@ -86,6 +108,7 @@ def ranked_table(df: pd.DataFrame, basis: str, kinds: tuple[str, ...] | None = N
     """
     out = df.copy()
     out["value"] = basis_value(out, basis)
+    out["estimated"] = basis_estimated(out, basis)
     out = out.dropna(subset=["value"])
     if basis == "per_capita":
         out = out[~out["entity_id"].isin(PER_CAPITA_EXCLUDE)]
@@ -93,7 +116,7 @@ def ranked_table(df: pd.DataFrame, basis: str, kinds: tuple[str, ...] | None = N
         out = out[out["kind"].isin(kinds)]
     out = out.sort_values("value", ascending=False).reset_index(drop=True)
     out["rank"] = np.arange(1, len(out) + 1)
-    cols = ["entity_id", "name", "kind", "parent", "region", "value", "rank", "year"]
+    cols = ["entity_id", "name", "kind", "parent", "region", "value", "estimated", "rank", "year"]
     return out[[c for c in cols if c in out.columns]]
 
 
@@ -315,8 +338,10 @@ def nearest(df: pd.DataFrame, entity_id: str, basis: str, n: int = 3,
         pool = pool[pool["kind"] == among]
     pool = pool.assign(distance=(pool["value"] - target["value"]).abs())
     neigh = pool.sort_values("distance").head(n)
+    cols = [c for c in ("entity_id", "name", "kind", "region", "value", "estimated", "rank", "year")
+            if c in table.columns]
     return {
-        "entity": target[["entity_id", "name", "kind", "value", "rank", "year"]].to_dict(),
+        "entity": target[cols].to_dict(),
         "basis": basis,
-        "nearest": neigh[["entity_id", "name", "kind", "value", "rank", "year"]].to_dict(orient="records"),
+        "nearest": neigh[cols].to_dict(orient="records"),
     }

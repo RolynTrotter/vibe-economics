@@ -1,7 +1,10 @@
 # Ticket 0002 — Subnational GDP comparison
 
-**Status:** BUILT (nominal / PPP / per-capita). Median-income basis deferred to
-[ticket 0007](0007-subnational-median-income-basis.md) (needs a live `CENSUS_API_KEY`).
+**Status:** BUILT (nominal / PPP / per-capita). Median-income basis in
+[ticket 0007](0007-subnational-median-income-basis.md); metro punch-out in
+[ticket 0008](0008-metro-punchout-hinterlands.md); **same-year alignment + year slider
+in [ticket 0009](0009-gdp-year-smoothing.md)** (the ladder is now as-of a chosen year,
+1997→2025, with interpolated/cast-forward figures asterisked).
 **Service id:** `subnational_gdp`
 
 ## What shipped

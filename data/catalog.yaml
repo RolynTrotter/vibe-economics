@@ -77,6 +77,29 @@ datasets:
       gdp_ppp_usd, population, year. US-state ppp = nominal (US ≈ PPP base; ~1.01).
       Powers the subnational_gdp service (ticket 0002) and the shared app/core/geo.py.
 
+  subnational_gdp_timeseries:
+    title: "Subnational GDP — multi-year time series (US states + countries: nominal, PPP, population)"
+    source: "BEA Regional (US state GDP & income, 1997+) + World Bank WDI (country GDP/PPP/population history) + IMF DataMapper/WEO (near-term growth for casting forward)"
+    homepage: "https://apps.bea.gov/regional/ ; https://data.worldbank.org/ ; https://www.imf.org/external/datamapper/"
+    url: "multi-source (BEA + World Bank + IMF APIs) — see acquire() in service timeseries.py"
+    license: >
+      BEA: U.S. Government work, public domain. World Bank WDI: CC BY 4.0. IMF
+      DataMapper: IMF terms, attribution required. All license-clean.
+    api_key: "BEA_API_KEY"
+    raw: "subnational_gdp_timeseries/"
+    processed: "subnational_gdp_timeseries.parquet"
+    compiler: "app.services.subnational_gdp.timeseries:compile_timeseries"
+    notes: >
+      Multi-call acquisition; build via the service entrypoint:
+      python -m app.services.subnational_gdp.timeseries build
+      (acquire + compile + write parquet). Long tidy schema: entity_id, name, kind
+      (state|country), parent, region, year, metric (gdp_nominal_usd | gdp_ppp_usd |
+      population), value (absolute units), source (bea | worldbank = observed actuals;
+      imf = WEO observations/forecasts used only for near-term growth). Powers the
+      year-slider + same-year smoothing/imputation in the subnational_gdp service
+      (ticket 0009); estimate.py aligns every place to a chosen year and flags
+      interpolated/extrapolated figures.
+
   # --- Catalogued sources for upcoming services (acquire/compile not yet wired) ---
 
   subnational_metros:

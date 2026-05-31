@@ -161,6 +161,8 @@ a { color: var(--accent); }
   min-width: 56px;
   text-align: right;
 }
+/* Estimated (interpolated/extrapolated) value — slightly muted, asterisk emphasised. */
+.lval-est { color: var(--muted); font-style: italic; }
 
 .link-btn {
   background: none;
