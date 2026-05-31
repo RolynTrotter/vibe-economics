@@ -71,6 +71,7 @@ export default function SubnationalGdp() {
   const [matchState, setMatchState] = useState("US-CA");
   const [removeCapital, setRemoveCapital] = useState(false);
   const [removeLargest, setRemoveLargest] = useState(false);
+  const [removeRichest, setRemoveRichest] = useState(false);
 
   useEffect(() => {
     loadDataset("subnational_gdp").then(setData).catch((e) => setError(e.message));
@@ -78,16 +79,17 @@ export default function SubnationalGdp() {
 
   const kinds = KINDS.find((k) => k.key === kindKey)?.kinds ?? null;
   const isPerCapita = basis === "per_capita";
-  const hinterland = (removeCapital || removeLargest) && data?.hinterland?.places?.length;
+  const punchout = removeCapital || removeLargest || removeRichest;
+  const hinterland = punchout && data?.hinterland?.places?.length;
 
   const table = useMemo(() => {
     if (!data) return [];
-    if (removeCapital || removeLargest) {
+    if (punchout) {
       if (!data.hinterland?.places?.length) return [];
-      return m.hinterlandTable(data.hinterland.places, basis, removeCapital, removeLargest, kinds);
+      return m.hinterlandTable(data.hinterland.places, basis, removeCapital, removeLargest, removeRichest, kinds);
     }
     return m.rankedTable(data.entities, basis, kinds);
-  }, [data, basis, kindKey, removeCapital, removeLargest]);
+  }, [data, basis, kindKey, removeCapital, removeLargest, removeRichest]);
 
   const q = query.trim().toLowerCase();
   const filtered = useMemo(
@@ -159,17 +161,21 @@ export default function SubnationalGdp() {
           </div>
           <div className="seg">
             <button className={removeCapital ? "active" : ""} onClick={() => setRemoveCapital((v) => !v)}>
-              {removeCapital ? "✓ " : ""}Capital metro
+              {removeCapital ? "✓ " : ""}Capital
             </button>
             <button className={removeLargest ? "active" : ""} onClick={() => setRemoveLargest((v) => !v)}>
-              {removeLargest ? "✓ " : ""}Largest metro
+              {removeLargest ? "✓ " : ""}Largest
+            </button>
+            <button className={removeRichest ? "active" : ""} onClick={() => setRemoveRichest((v) => !v)}>
+              {removeRichest ? "✓ " : ""}Richest
             </button>
           </div>
           {hinterland && (
             <div className="footnote" style={{ marginTop: 8 }}>
-              Hinterland view: each economy minus its{" "}
-              {removeCapital && removeLargest ? "capital and largest" : removeCapital ? "capital" : "largest"}{" "}
-              metro, recomputed on what’s left. US states (CSA footprint, by county) sit
+              Hinterland view: each economy minus its selected metro(s)
+              {" "}({[removeCapital && "capital", removeLargest && "largest",
+                    removeRichest && "richest (GDP/capita)"].filter(Boolean).join(", ")}),
+              recomputed on what’s left. US states (CSA footprint, by county) sit
               alongside OECD countries (FUA). Non-OECD countries and places that are
               essentially all-metro (e.g. New Jersey) are hidden.
             </div>

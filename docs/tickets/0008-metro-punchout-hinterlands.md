@@ -23,10 +23,14 @@ average (Berlin is below the national mean) — a real, instructive effect.
   population (GDP ÷ GDP-per-person). National totals from World Bank WDI. 30 countries,
   ~550 metros. Compiled to `data/processed/subnational_metros.parquet`
   (`app/services/subnational_gdp/metros.py`).
-- **Removal rules** (`model.select_removed_metros`): *largest* = top-GDP FUA; *capital*
+- **Removal toggles** (`model.select_removed_metros`): *largest* = top-GDP FUA; *capital*
   = the capital's FUA (code map, e.g. Washington `USA04F`, Wellington `NZL03F`, else
-  `<prefix>001F`/`<prefix>01F`); *both* and they coincide (London, Paris, Tokyo) ⇒ also
-  drop the next-largest, so two distinct metros come out.
+  `<prefix>001F`/`<prefix>01F`); *richest* = highest GDP-per-capita FUA. Each checked
+  toggle nominates one metro; when picks coincide (London is capital *and* largest; the
+  Bay Area is largest *and* richest) each falls to the next-best in its own ranking and
+  any shortfall is filled by next-largest GDP, so #distinct removed == #toggles checked.
+  (E.g. USA all-three → New York, Washington, San Francisco; California → LA, Sacramento,
+  San Jose-SF; Germany → München, Berlin, Mainz.)
 - **Carve-out:** `rest_gdp = national × (1 − Σ metro GDP shares)`,
   `rest_pop = national_pop − Σ metro_pop`, recomputed on all three bases. The US enters
   as a single entity; non-OECD countries and US states are hidden in this view.
