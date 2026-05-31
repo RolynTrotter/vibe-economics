@@ -176,3 +176,5 @@ a { color: var(--accent); }
 .swatch { width: 11px; height: 11px; border-radius: 3px; display: inline-block; flex: 0 0 auto; }
 
 .lremoved { color: var(--muted); font-size: 0.72rem; font-style: italic; }
+
+.lest { font-size: 0.6rem; color: var(--muted); border: 1px solid var(--border); border-radius: 4px; padding: 0 3px; margin-left: 5px; vertical-align: middle; text-transform: uppercase; letter-spacing: .02em; }

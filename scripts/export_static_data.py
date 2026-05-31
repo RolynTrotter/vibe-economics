@@ -118,6 +118,7 @@ def _round_place(p: dict) -> dict:
     """JSON-serialise a model place dict (round floats, keep keys the JS expects)."""
     return {
         "id": p["id"], "name": p["name"], "kind": p["kind"], "region": p["region"],
+        "curated": bool(p.get("curated", False)),
         "nat_gdp_nominal_usd": None if p["nat_gdp_nominal_usd"] is None else round(p["nat_gdp_nominal_usd"]),
         "nat_gdp_ppp_usd": round(p["nat_gdp_ppp_usd"]),
         "nat_population": round(p["nat_population"]),
@@ -153,17 +154,21 @@ def _build_hinterland(entities_df: pd.DataFrame) -> dict:
         places += cp
     if (proc / "us_state_metros.parquet").exists():
         places += model.state_places(pd.read_parquet(proc / "us_state_metros.parquet"), entities_df)
+    if (proc / "nonoecd_metros.parquet").exists():
+        places += model.nonoecd_places(pd.read_parquet(proc / "nonoecd_metros.parquet"), entities_df)
 
     places = [_round_place(p) for p in places]
     places.sort(key=lambda p: p["nat_gdp_ppp_usd"], reverse=True)
     return {
         "source": "OECD Functional Urban Areas (countries) + Census/OMB CSA + BEA county "
-                  "GDP/population (US states). National totals: World Bank WDI / BEA.",
+                  "GDP/population (US states) + curated metros for big non-OECD economies. "
+                  "National totals: World Bank WDI / BEA.",
         "note": "Each place's capital and/or largest metro can be removed and values "
                 "recomputed on the remaining hinterland. Countries: OECD FUA share of "
-                "national GDP (OECD/EU coverage only). US states: in-state county GDP "
-                "(place of work) over the metro's CSA footprint, population netted by "
-                "residence. Places left with little residual (e.g. New Jersey) are hidden.",
+                "national GDP. US states: in-state county GDP (place of work) over the "
+                "metro's CSA footprint, population netted by residence. Non-OECD "
+                "countries (China, India, Brazil, Russia…) use curated metro estimates "
+                "(marked ‘est.’). Places left with little residual (e.g. New Jersey) are hidden.",
         "places": places,
     }
 

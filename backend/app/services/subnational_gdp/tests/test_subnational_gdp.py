@@ -49,6 +49,37 @@ def state_places(us_metros, df):
     return model.state_places(us_metros, df)
 
 
+@pytest.fixture(scope="module")
+def nonoecd_places(df):
+    from app.services.subnational_gdp.nonoecd_metros import load_nonoecd_metros
+    return model.nonoecd_places(load_nonoecd_metros(), df)
+
+
+# --- non-OECD curated metros (ticket 0008 phase 3) -----------------------------
+def test_nonoecd_places_cover_big_economies(nonoecd_places):
+    ids = {p["id"] for p in nonoecd_places}
+    assert {"CHN", "IND", "BRA", "RUS", "IDN"} <= ids
+    assert all(p["curated"] for p in nonoecd_places)
+    chn = next(p for p in nonoecd_places if p["id"] == "CHN")
+    assert {"Shanghai", "Beijing"} <= {mm["name"] for mm in chn["metros"]}
+
+
+def test_nonoecd_primacy_contrast(nonoecd_places):
+    # Broad-based China barely moves; primate Thailand (Bangkok) falls hard.
+    whole = model.hinterland_table(nonoecd_places, "per_capita", False, False, False).set_index("entity_id")
+    cut = model.hinterland_table(nonoecd_places, "per_capita", True, True, True).set_index("entity_id")
+    chn_drop = 1 - cut.loc["CHN", "value"] / whole.loc["CHN", "value"]
+    tha_drop = 1 - cut.loc["THA", "value"] / whole.loc["THA", "value"]
+    assert chn_drop < 0.10 < tha_drop
+    assert cut.loc["CHN", "curated"]  # flagged as estimate
+
+
+def test_nonoecd_appear_in_combined_hinterland(country_places, nonoecd_places):
+    table = model.hinterland_table(country_places + nonoecd_places, "ppp", False, True, False)
+    ids = set(table["entity_id"])
+    assert "CHN" in ids and "IND" in ids   # previously absent from the FUA-only view
+
+
 def test_coverage(df):
     # 50 states + DC, plus a broad set of countries.
     states = df[df["kind"] == "state"]
