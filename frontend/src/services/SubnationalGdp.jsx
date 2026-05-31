@@ -285,9 +285,15 @@ export default function SubnationalGdp() {
                     className={`lrow${e.kind === "state" ? " is-state" : ""}${e.id === "USA" ? " is-state" : ""}${hit ? " hit" : ""}`}
                   >
                     <span className="lrank">{e.rank}</span>
-                    <span className="lname">
+                    <span className={`lname${e.removed?.length ? " lname-scroll" : ""}`}>
                       {e.name}
                       {e.curated ? <span className="lest" title="curated metro estimate">est.</span> : null}
+                      {isMedian && e.median_income_year && e.median_income_year < 2023 ? (
+                        <sup
+                          className={`lmi-yr${e.median_income_year < 2022 ? " stale" : " lagged"}`}
+                          title={`Income data from ${e.median_income_year} OECD IDD (most countries: 2023)`}
+                        >{e.median_income_year}</sup>
+                      ) : null}
                       {e.removed?.length ? (
                         <span className="lremoved"> − {e.removed.join(", ")}</span>
                       ) : null}
@@ -320,12 +326,51 @@ export default function SubnationalGdp() {
           </div>
 
           <div className="panel footnote">
-            {data.sources}
-            <ul style={{ margin: "8px 0 0", paddingLeft: 18 }}>
-              {data.caveats.map((c) => (
-                <li key={c}>{c}</li>
-              ))}
-            </ul>
+            <details className="methodology">
+              <summary>Data sources &amp; methodology</summary>
+              <div className="method-body">
+                <p><strong>Total GDP (nominal / PPP)</strong><br />
+                Countries: World Bank WDI 2024 — nominal at market exchange rates; PPP via
+                World Bank conversion factors. US states: BEA Regional 2025 (preliminary) —
+                nominal only; PPP proxy = nominal (US ≈ PPP reference economy, ratio ≈ 1.01).
+                States are one year ahead of countries; for fast-growing economies this gap
+                is real.</p>
+
+                <p><strong>GDP per capita (PPP)</strong><br />
+                PPP GDP ÷ population (World Bank / BEA-derived).
+                DC is excluded: its output is attributed to metro-wide workers but divided
+                by DC residents alone, producing an artifact ~3× the true level.</p>
+
+                <p><strong>Median income (PPP)</strong><br />
+                Countries: OECD Income Distribution Database — median equivalised disposable
+                income (national currency) ÷ World Bank private-consumption PPP. Income data
+                vintage varies by country: most 2022–2023; Russia &amp; South Africa 2017;
+                Japan 2021; Australia 2020. Stale figures are tagged with their year in the
+                ladder. US states: Census ACS 2023 (5-year) median household income × a US
+                anchor ratio (OECD US equivalised median ÷ Census US median) to put states
+                on the OECD equivalised scale. Comparable in level but not size-adjusted
+                across countries; OECD/EU coverage only.</p>
+
+                <p><strong>Hinterland (metro punch-out)</strong><br />
+                OECD countries: Functional Urban Area (FUA) metro GDP shares, vintage
+                2021–2023 (typically 2–3 years behind the national GDP they are applied to).
+                US states: BEA county GDP (place of work) + Census county population
+                (residence) over each metro's CSA footprint, 2023. Non-OECD economies
+                (China, India, Brazil, Russia, etc.): curated estimates from public reporting,
+                marked <em>est.</em> — ballpark, not gospel. National GDP totals are the same
+                2024/2025 WDI/BEA figures as the main ranking; only the metro <em>shares</em>
+                carry the older vintage.</p>
+
+                <p style={{ marginBottom: 0 }}><strong>Sources:</strong> {data.sources}</p>
+              </div>
+            </details>
+            {data.caveats.length > 0 && (
+              <ul style={{ margin: "10px 0 0", paddingLeft: 18 }}>
+                {data.caveats.map((c) => (
+                  <li key={c}>{c}</li>
+                ))}
+              </ul>
+            )}
           </div>
         </>
       )}
