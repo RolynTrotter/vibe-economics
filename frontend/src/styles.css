@@ -205,3 +205,16 @@ details.methodology[open] summary::before { content: "▾ "; }
 .method-body { padding-top: 8px; }
 .method-body p { margin: 0 0 10px; line-height: 1.6; }
 .method-body p:last-child { margin-bottom: 0; }
+
+/* Localized-inflation lens (negative-productivity service) */
+.ibars { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+.ibar-row { display: flex; align-items: center; gap: 8px; font-size: 0.82rem; }
+.ibar-cat { flex: 0 0 38%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ibar-track { position: relative; flex: 1 1 auto; height: 16px; background: #161d36; border-radius: 6px; }
+.ibar-zero { position: absolute; top: -2px; bottom: -2px; width: 1px; background: #44507a; }
+.ibar-fill { position: absolute; top: 2px; bottom: 2px; border-radius: 4px; }
+.ibar-val { flex: 0 0 auto; width: 50px; text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+.ibar-row.hot .ibar-cat { color: var(--danger); font-weight: 600; }
+.ibar-row.cold .ibar-cat { color: var(--accent); font-weight: 600; }
+.episodes { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.episodes button { font-size: 0.72rem; padding: 4px 8px; }

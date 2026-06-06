@@ -44,6 +44,17 @@ sources are flagged ⚠️.
 | **BLS / national stat offices** | Official CPI & regional price parities | no | public domain | e.g. BEA Regional Price Parities for US metros. |
 | **BEA RPP** | US regional price parities by metro/state | yes (free) | public domain | License-clean US city cost differences. |
 
+## Productivity & value destruction (ticket 0010)
+
+| Source | What | Key? | License | Notes |
+|--------|------|------|---------|-------|
+| **SEC EDGAR — Financial Statement Data Sets** | Bulk quarterly company financials (income/balance sheet) | no | public domain | Firm-level interest-coverage, ROIC, leverage → zombie share & EVA screen. US listed firms only. |
+| **BLS Productivity** | Labor Productivity & Costs + Total Factor / Multifactor (KLEMS) by industry | yes (free) | public domain | Flags industries with **negative** real VA-per-hour / TFP growth. `BLS_API_KEY` works (ticket 0006). |
+| **BEA GDP-by-industry** | Value-added by industry | yes (free) | public domain | Value-added per worker; the value-subtraction lens. `BEA_API_KEY` works. |
+| **Penn World Table** | Cross-country TFP levels & growth, capital, hours | no | CC BY 4.0 | GitHub-mirrorable; identifies negative-TFP country-years. |
+| **OECD Productivity** | Comparative labour/multifactor productivity | no | attribution | SDMX JSON; cross-country benchmark. |
+| **BIS** | Zombie-firm research & methodology (ICR<1, ≥3y, age ≥10y) | no | attribution | Definitional grounding, not a data pipeline. |
+
 ## Currency circulation
 
 | Source | What | Key? | License | Notes |

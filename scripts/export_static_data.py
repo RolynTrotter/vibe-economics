@@ -240,6 +240,53 @@ def _build_hinterland(entities_df: pd.DataFrame) -> dict:
     }
 
 
+def export_negative_productivity() -> None:
+    """Localized-inflation lens (ticket 0010): precompute the dispersion series,
+    per-month category breakdown, and latest snapshot from the tidy CPI table."""
+    import sys
+
+    sys.path.insert(0, str(ROOT / "backend"))
+    from app.services.negative_productivity import data as npd
+    from app.services.negative_productivity import model
+
+    df = pd.read_parquet(ROOT / "data" / "processed" / "cpi_major_groups.parquet")
+    series = model.dispersion_series(df)
+    breakdown = model.category_breakdown(df)
+    latest = model.latest_snapshot(df)
+
+    payload = {
+        "dataset": "cpi_major_groups",
+        "lens": "localized_inflation",
+        "source": (
+            "U.S. BLS, CPI-U (U.S. city average, NSA): six major groups with "
+            "continuous history since 1967 + All items. Public domain."
+        ),
+        "headline_label": npd.HEADLINE_LABEL,
+        "categories": list(npd.CATEGORIES.values()),
+        "definition": (
+            "Localized inflation = relative-price dispersion. dispersion is the "
+            "cross-sectional std dev of the six groups' 12-month % changes; spread "
+            "is hottest − coldest; skew is Pearson moment skewness. Ball & Mankiw "
+            "(1995): positive skew (a few categories spiking up) is the fingerprint "
+            "of an adverse supply shock and pulls headline inflation up."
+        ),
+        "episodes": [{"start": s, "end": e, "label": lab} for s, e, lab in model.EPISODES],
+        "first": f"{series[0]['year']:04d}-{series[0]['month']:02d}" if series else None,
+        "last": latest.get("label"),
+        "series": series,
+        "by_month": breakdown,
+        "latest": latest,
+    }
+
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    out = OUT_DIR / "negative_productivity_inflation.json"
+    out.write_text(json.dumps(payload, separators=(",", ":")))
+    size_kb = out.stat().st_size / 1e3
+    print(f"wrote {len(series)} months × {len(payload['categories'])} groups "
+          f"-> {out.relative_to(ROOT)} ({size_kb:.0f} KB)")
+
+
 if __name__ == "__main__":
     export_jst_returns()
     export_subnational_gdp()
+    export_negative_productivity()

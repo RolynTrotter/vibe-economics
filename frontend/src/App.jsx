@@ -4,10 +4,12 @@
 import { useState } from "react";
 import SafeWithdrawal from "./services/SafeWithdrawal.jsx";
 import SubnationalGdp from "./services/SubnationalGdp.jsx";
+import NegativeProductivity from "./services/NegativeProductivity.jsx";
 
 const SERVICES = [
   { key: "safe_withdrawal", label: "Safe Withdrawal", Component: SafeWithdrawal },
   { key: "subnational_gdp", label: "Subnational GDP", Component: SubnationalGdp },
+  { key: "negative_productivity", label: "Negative Productivity", Component: NegativeProductivity },
   { key: "cost_of_living", label: "Cost of Living", Component: null },
   { key: "currency", label: "Currency", Component: null },
   { key: "fed_wealth", label: "Fed Wealth/Income", Component: null },

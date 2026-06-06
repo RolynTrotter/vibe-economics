@@ -108,3 +108,4 @@ every other service: copy its shape (data loader → model → router → tests 
 | 5 | Cost of living comparison | [0005](docs/tickets/0005-cost-of-living-comparison.md) | #2 | planned (flagship) |
 | 4 | Fed wealth & income trends | [0004](docs/tickets/0004-fed-wealth-income-trends.md) | #4 | planned |
 | 1 | Currency circulation crossover | [0001](docs/tickets/0001-currency-circulation.md) | #5 | planned |
+| 10 | Negative productivity & value destruction | [0010](docs/tickets/0010-negative-productivity-tracking.md) | — | **built** (localized-inflation lens; zombie/value-subtraction lenses next) |

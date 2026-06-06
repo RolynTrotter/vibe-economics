@@ -299,3 +299,24 @@ datasets:
     processed: null
     compiler: null
     notes: "Key-free SDMX API. Comparative price levels, PPPs. License-clean alternative for cost-of-living."
+
+  cpi_major_groups:
+    title: "US CPI major groups — monthly index (localized-inflation lens, ticket 0010)"
+    source: "U.S. Bureau of Labor Statistics, CPI-U (U.S. city average, not seasonally adjusted)"
+    homepage: "https://www.bls.gov/cpi/"
+    url: "https://api.bls.gov/publicAPI/v2/timeseries/data/ (POST; multi-series, see service data.py)"
+    license: "U.S. Government work, public domain. Attribute BLS."
+    api_key: "BLS_API_KEY"
+    raw: "cpi_major_groups/"
+    processed: "cpi_major_groups.parquet"
+    compiler: "app.services.negative_productivity.data:compile_cpi"
+    notes: >
+      Multi-call API, so use the service entrypoint rather than the single-URL CLI:
+      python -m app.services.negative_productivity.data build  (acquire + compile + write).
+      Tidy long schema: year, month, category, cpi_index. Series are CUUR0000 (CPI-U,
+      US city avg, NSA): SA0 All items (headline) + six major groups with continuous
+      history since 1967 — SAF Food and beverages, SAH Housing, SAA Apparel, SAT
+      Transportation, SAM Medical care, SAG Other goods and services. Recreation (SAR)
+      and Education & communication (SAE) start in the 1998 revision and are omitted to
+      keep the dispersion panel consistent. Powers the localized-inflation lens
+      (relative-price dispersion; Ball & Mankiw 1995).
