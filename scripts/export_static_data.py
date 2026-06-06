@@ -286,7 +286,53 @@ def export_negative_productivity() -> None:
           f"-> {out.relative_to(ROOT)} ({size_kb:.0f} KB)")
 
 
+def export_negative_productivity_zombies() -> None:
+    """Zombie-firm lens (ticket 0010, lens 2): precompute the zombie-share series and
+    the latest roster (mature + all) from the SEC fundamentals panel."""
+    import sys
+
+    sys.path.insert(0, str(ROOT / "backend"))
+    from app.services.negative_productivity import zombie_model as zm
+
+    df = pd.read_parquet(ROOT / "data" / "processed" / "sec_zombie_fundamentals.parquet")
+    series = zm.zombie_share_series(df)
+    meta = zm.meta_summary(df)
+
+    payload = {
+        "dataset": "sec_zombie_fundamentals",
+        "lens": "zombie_firms",
+        "source": (
+            "SEC EDGAR XBRL frames (data.sec.gov), public domain: OperatingIncomeLoss "
+            "(EBIT) ÷ InterestExpense, US-listed firms 2009–present."
+        ),
+        "definition": meta["definition"],
+        "first_year": meta["first_year"],
+        "last_complete_year": meta["last_complete_year"],
+        "series": series,
+        "latest_mature": zm.latest_zombies(df, top_n=25, mature_only=True),
+        "latest_all": zm.latest_zombies(df, top_n=25, mature_only=False),
+        "caveats": [
+            "US-listed XBRL universe only (~2009 on); private, foreign and pre-2009 "
+            "firms are absent.",
+            "Financials and utilities are NOT excluded (no SIC join yet); they distort "
+            "interest-coverage, so the level runs higher than BIS estimates — read the "
+            "trend, not the absolute.",
+            "Firm 'age' is a reporting-age proxy (years in this panel), not "
+            "incorporation age; the BIS screen is age ≥ 10.",
+            "Delisted zombies leave the panel (survivorship); the most recent year(s) "
+            "are marked provisional while filings arrive.",
+        ],
+    }
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    out = OUT_DIR / "negative_productivity_zombies.json"
+    out.write_text(json.dumps(payload, separators=(",", ":")))
+    size_kb = out.stat().st_size / 1e3
+    print(f"wrote {len(series)} years + {len(payload['latest_mature']['firms'])} "
+          f"latest zombies -> {out.relative_to(ROOT)} ({size_kb:.0f} KB)")
+
+
 if __name__ == "__main__":
     export_jst_returns()
     export_subnational_gdp()
     export_negative_productivity()
+    export_negative_productivity_zombies()

@@ -17,7 +17,7 @@ import LineChart from "../components/LineChart.jsx";
 
 const LENSES = [
   { key: "inflation", label: "Localized inflation", ready: true },
-  { key: "zombies", label: "Zombie firms", ready: false },
+  { key: "zombies", label: "Zombie firms", ready: true },
   { key: "value_sub", label: "Value subtraction", ready: false },
 ];
 
@@ -49,6 +49,7 @@ export default function NegativeProductivity() {
         </div>
       </div>
       {lens === "inflation" && <InflationLens />}
+      {lens === "zombies" && <ZombieLens />}
     </div>
   );
 }
@@ -271,4 +272,156 @@ function nearestIdx(series, t) {
     if (Math.abs(series[i].t - t) < Math.abs(series[best].t - t)) best = i;
   }
   return best;
+}
+
+// ---- Lens 2: zombie firms (interest coverage < 1 for ≥3 years) ----------------
+const usd = (v) =>
+  Math.abs(v) >= 1e9 ? `$${(v / 1e9).toFixed(1)}B` : `$${Math.round(v / 1e6)}M`;
+
+function ZombieLens() {
+  const [data, setData] = useState(null);
+  const [error, setError] = useState(null);
+  const [matureOnly, setMatureOnly] = useState(true);
+
+  useEffect(() => {
+    loadDataset("negative_productivity_zombies").then(setData).catch((e) => setError(e.message));
+  }, []);
+
+  if (error) return <div className="panel error">Error: {error}</div>;
+  if (!data) return <div className="panel loading">Loading SEC fundamentals…</div>;
+
+  // Lines use only complete years so the provisional latest dip doesn't mislead.
+  const complete = data.series.filter((r) => !r.provisional && r.mature_share != null);
+  const latestComplete = complete[complete.length - 1];
+  const broadLatest = data.series.filter((r) => !r.provisional).slice(-1)[0];
+
+  const charts = [
+    {
+      label: "All firms (ICR<1, 3 yrs)",
+      color: "#9fb0d8",
+      points: data.series.filter((r) => !r.provisional).map((r) => ({ x: r.year, y: r.share })),
+    },
+    {
+      label: "Mature firms (≥10y reporting)",
+      color: HOT,
+      points: complete.map((r) => ({ x: r.year, y: r.mature_share })),
+    },
+  ];
+
+  const roster = matureOnly ? data.latest_mature : data.latest_all;
+  const maxInt = Math.max(1, ...roster.firms.map((f) => f.interest));
+
+  return (
+    <div>
+      <div className="panel">
+        <div className="cards">
+          <MetricCard
+            label={`Mature zombies · ${latestComplete?.year ?? "—"}`}
+            value={latestComplete ? `${latestComplete.mature_share.toFixed(1)}%` : "—"}
+            sub={`${latestComplete?.n_mature_zombies ?? 0} of ${latestComplete?.n_mature ?? 0} firms ≥10y old`}
+            tone={latestComplete && latestComplete.mature_share >= 20 ? "bad" : "warn"}
+          />
+          <MetricCard
+            label="All listed firms"
+            value={broadLatest ? `${broadLatest.share.toFixed(1)}%` : "—"}
+            sub={`${broadLatest?.n_zombies ?? 0} of ${broadLatest?.n_firms ?? 0} with 3-yr data`}
+            tone="warn"
+          />
+          <MetricCard
+            label="Peak mature share"
+            value={`${Math.max(...complete.map((r) => r.mature_share)).toFixed(1)}%`}
+            sub={`yr ${complete.reduce((a, b) => (b.mature_share > a.mature_share ? b : a)).year} — cheap-money era`}
+          />
+          <MetricCard
+            label="Debt they can't service"
+            value={usd(roster.firms.reduce((s, f) => s + f.interest, 0))}
+            sub={`interest owed by the top ${roster.firms.length} ${matureOnly ? "mature " : ""}zombies`}
+            tone="bad"
+          />
+        </div>
+      </div>
+
+      <div className="panel">
+        <div className="chart-title">
+          Share of US-listed firms that are zombies, {complete[0]?.year}–{latestComplete?.year}
+        </div>
+        <LineChart
+          series={charts}
+          yFormat={(v) => `${v.toFixed(0)}%`}
+          xLabel="year"
+          yLabel="% of firms"
+          height={230}
+        />
+        <div className="footnote" style={{ marginTop: 8 }}>
+          A zombie can't cover its interest from operating earnings (interest-coverage
+          ratio &lt; 1) for three years running — alive only by rolling over debt, tying
+          up capital and labour that healthier firms could use. The mature-firm line
+          climbs through the cheap-money 2010s, peaks around 2021–22, and eases as rates
+          rise. Levels run high because financials and small loss-makers aren't excluded —
+          read the trend. The latest year(s) are omitted while filings arrive.
+        </div>
+      </div>
+
+      <div className="panel">
+        <div className="chart-title">
+          Biggest zombies by unpayable interest — {roster.year}
+        </div>
+        <div className="seg" style={{ marginBottom: 10 }}>
+          {[
+            [true, "Mature (≥10y)"],
+            [false, "All firms"],
+          ].map(([v, lab]) => (
+            <button key={String(v)} className={matureOnly === v ? "active" : ""} onClick={() => setMatureOnly(v)}>
+              {lab}
+            </button>
+          ))}
+        </div>
+        <div className="ibars">
+          {roster.firms.map((f) => (
+            <div key={f.name + f.since} className="ibar-row">
+              <span className="ibar-cat" style={{ flexBasis: "46%" }} title={f.name}>
+                {f.name}
+                <span className="footnote" style={{ marginLeft: 6 }}>{f.loc}</span>
+              </span>
+              <span className="ibar-track">
+                <span
+                  className="ibar-fill"
+                  style={{ left: 0, width: `${(f.interest / maxInt) * 100}%`, background: HOT }}
+                />
+              </span>
+              <span className="ibar-val" style={{ width: 96 }}>
+                {usd(f.interest)} · {f.icr < 0 ? "ICR<0" : `ICR ${f.icr.toFixed(2)}`}
+              </span>
+            </div>
+          ))}
+        </div>
+        <div className="footnote" style={{ marginTop: 8 }}>
+          Ranked by interest expense — the size of the debt service these firms' earnings
+          didn't cover. ICR &lt; 0 means operating losses (negative EBIT). Familiar names
+          here are the ones a long stretch of cheap credit kept upright.
+        </div>
+      </div>
+
+      <details className="methodology panel">
+        <summary>Methodology &amp; sources</summary>
+        <div className="method-body">
+          <p>
+            <strong>Definition.</strong> {data.definition} (BIS — Banerjee &amp; Hofmann,
+            2018/2020.) The ≥3-year / age screen is deliberate: a young firm investing
+            through early losses is <em>not</em> a zombie.
+          </p>
+          <p>
+            <strong>Data.</strong> {data.source} Interest-coverage = EBIT
+            (OperatingIncomeLoss) ÷ InterestExpense, computed where interest &gt; 0.
+          </p>
+          <p><strong>Caveats.</strong></p>
+          <ul className="footnote" style={{ margin: 0, paddingLeft: 18 }}>
+            {data.caveats.map((c, i) => (
+              <li key={i} style={{ marginBottom: 4 }}>{c}</li>
+            ))}
+          </ul>
+        </div>
+      </details>
+    </div>
+  );
 }

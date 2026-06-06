@@ -320,3 +320,23 @@ datasets:
       and Education & communication (SAE) start in the 1998 revision and are omitted to
       keep the dispersion panel consistent. Powers the localized-inflation lens
       (relative-price dispersion; Ball & Mankiw 1995).
+
+  sec_zombie_fundamentals:
+    title: "SEC EDGAR XBRL fundamentals — operating income & interest expense (zombie-firm lens, ticket 0010)"
+    source: "U.S. SEC EDGAR, XBRL 'frames' API (data.sec.gov)"
+    homepage: "https://www.sec.gov/edgar/sec-api-documentation"
+    url: "https://data.sec.gov/api/xbrl/frames/us-gaap/{concept}/USD/CY{year}.json (multi-call, see service zombie_data.py)"
+    license: "U.S. Government work, public domain. SEC fair-use: send a descriptive User-Agent with contact."
+    api_key: null
+    raw: "sec_zombie_fundamentals/"
+    processed: "sec_zombie_fundamentals.parquet"
+    compiler: "app.services.negative_productivity.zombie_data:compile_zombie"
+    notes: >
+      Multi-call API, so use the service entrypoint rather than the single-URL CLI:
+      python -m app.services.negative_productivity.zombie_data build  (acquire + compile).
+      Pulls two us-gaap concepts per year (CY frames, 2009–present): OperatingIncomeLoss
+      (EBIT proxy) and InterestExpense. Tidy panel: cik, name, loc, year, ebit, interest,
+      icr (= ebit/interest, kept only where interest>0). Powers the zombie-firm lens:
+      interest-coverage < 1 for ≥3 consecutive years (BIS definition). Caveats: US-listed
+      XBRL universe only (~2009+); financials/utilities not excluded; firm "age" is a
+      reporting-age proxy; delisted zombies leave the panel (survivorship).

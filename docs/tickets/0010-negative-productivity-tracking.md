@@ -1,8 +1,9 @@
 # Ticket 0010 — Negative productivity & value destruction
 
 **Status:** IN PROGRESS — built as a **unified tab** with one lens per sub-tab.
-Lens 1 (**localized inflation / relative-price dispersion**) is shipped; the
-zombie-firm and value-subtraction lenses are scaffolded as "soon" sub-tabs.
+Lens 1 (**localized inflation / relative-price dispersion**) and Lens 2
+(**zombie firms**) are shipped; the value-subtraction lens is scaffolded as a
+"soon" sub-tab.
 **Service id:** `negative_productivity`
 
 ## What shipped (lens 1 — localized inflation)
@@ -22,10 +23,33 @@ zombie-firm and value-subtraction lenses are scaffolded as "soon" sub-tabs.
 - Empirically the dispersion + positive-skew "supply-shock signature" lights up in
   1980 (OPEC II, hottest = Transportation) and 2021–22 (pandemic), as expected.
 
-## Next lenses (same tab)
-- **Zombie firms** — interest-coverage < 1 for ≥3y from SEC EDGAR (needs a
-  User-Agent'd fetch path; EDGAR returns 403 without one in this environment).
-- **Value subtraction** — value-added per hour going backwards, from BLS/BEA.
+## What shipped (lens 2 — zombie firms)
+- Backend `zombie_data.py` (acquire+compile from the **SEC EDGAR XBRL frames API**,
+  `data.sec.gov`, public domain; a descriptive User-Agent satisfies SEC fair-use) +
+  pure `zombie_model.py` + router endpoints `/api/negative-productivity/zombies/*`.
+  Dataset `sec_zombie_fundamentals` (per-firm-year panel: cik, name, loc, year, ebit,
+  interest, icr) registered in the catalog.
+- Zombie = interest-coverage ratio (OperatingIncomeLoss ÷ InterestExpense) **< 1 for
+  3 consecutive years**. Reports a broad share and a **mature** subset (≥10 reporting
+  years, a proxy for the BIS age≥10 screen). Recent years auto-flagged `provisional`
+  by cross-sectional coverage.
+- Widget: zombie sub-tab — broad-vs-mature share time chart, and a roster of the
+  biggest zombies by unpayable interest (toggle mature/all), with caveats.
+- Static snapshot `negative_productivity_zombies.json`. Rebuild:
+  `python -m app.services.negative_productivity.zombie_data build` then
+  `python scripts/export_static_data.py`.
+- Empirically the mature-firm zombie share climbs ~14% (2018) → ~27% (2022 peak) and
+  eases as rates rise; the latest roster surfaces the expected debt-laden names
+  (Carnival, Transocean, AMC, Sabre, Melco).
+
+## Next lens (same tab)
+- **Value subtraction** — value-added per hour going backwards by industry, from BLS/BEA.
+
+## Known refinements for the zombie lens
+- Exclude **financials & utilities** (needs a SIC join — not in the XBRL frames;
+  per-company `data.sec.gov/submissions` has `sicDescription` but is one call per CIK).
+- Add the BIS "expected-profitability" arm (Tobin's Q below sector median).
+- True incorporation age instead of the reporting-age proxy.
 
 ## Summary
 Higher- vs lower-productivity jobs, firms, and sectors is uncontroversial. This
