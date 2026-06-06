@@ -9,7 +9,9 @@ from __future__ import annotations
 from fastapi import APIRouter
 
 from . import model
+from . import zombie_model
 from .data import CATEGORIES, HEADLINE_LABEL, load_cpi
+from .zombie_data import load_panel
 
 router = APIRouter(prefix="/api/negative-productivity", tags=["negative-productivity"])
 
@@ -55,3 +57,27 @@ def inflation_breakdown() -> dict:
 def inflation_latest() -> dict:
     df = load_cpi()
     return {"source": _SOURCE, **model.latest_snapshot(df)}
+
+
+# --------------------------------------------------------------------------- #
+# Lens 2 — zombie firms (interest coverage < 1 for ≥3 years)
+# --------------------------------------------------------------------------- #
+_ZOMBIE_SOURCE = (
+    "SEC EDGAR XBRL frames (data.sec.gov), public domain: OperatingIncomeLoss "
+    "(EBIT) ÷ InterestExpense, US-listed firms 2009–present."
+)
+
+
+@router.get("/zombies/meta")
+def zombies_meta() -> dict:
+    return {"lens": "zombie_firms", "source": _ZOMBIE_SOURCE, **zombie_model.meta_summary(load_panel())}
+
+
+@router.get("/zombies/share")
+def zombies_share() -> dict:
+    return {"source": _ZOMBIE_SOURCE, "series": zombie_model.zombie_share_series(load_panel())}
+
+
+@router.get("/zombies/latest")
+def zombies_latest(top: int = 25, mature_only: bool = True) -> dict:
+    return {"source": _ZOMBIE_SOURCE, **zombie_model.latest_zombies(load_panel(), top, mature_only)}
