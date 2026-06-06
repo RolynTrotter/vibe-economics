@@ -27,4 +27,5 @@ data/raw/*
 # Secrets / API keys
 .env
 *.env
+!_wishlist_env.env
 secrets.yaml
