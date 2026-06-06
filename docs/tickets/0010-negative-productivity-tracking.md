@@ -1,7 +1,31 @@
 # Ticket 0010 — Negative productivity & value destruction
 
-**Status:** planned (research/scoping — concept + data sourcing first)
+**Status:** IN PROGRESS — built as a **unified tab** with one lens per sub-tab.
+Lens 1 (**localized inflation / relative-price dispersion**) is shipped; the
+zombie-firm and value-subtraction lenses are scaffolded as "soon" sub-tabs.
 **Service id:** `negative_productivity`
+
+## What shipped (lens 1 — localized inflation)
+- Backend `app/services/negative_productivity/` (data.py acquire+compile from the
+  **BLS CPI** API, pure model.py, router.py, tests) on the **six CPI major groups
+  with continuous history since 1967** + All items (`cpi_major_groups` dataset).
+- Measures per month: headline (All-items YoY), **dispersion** (cross-sector std
+  dev of the six groups' 12-month changes), **spread** (hottest − coldest), **skew**
+  (Pearson moment skewness — Ball & Mankiw 1995: positive skew ↔ adverse supply
+  shock). Endpoints under `/api/negative-productivity/inflation/*`.
+- Widget `frontend/src/services/NegativeProductivity.jsx`: lens sub-tabs; headline-
+  vs-dispersion time chart with supply-shock jump buttons (1974/1980/2008/2021–22);
+  a month explorer with diverging per-group bars (the "localized inflation" fan);
+  methodology + caveats. Static snapshot `negative_productivity_inflation.json`.
+- Rebuild: `python -m app.services.negative_productivity.data build` then
+  `python scripts/export_static_data.py`.
+- Empirically the dispersion + positive-skew "supply-shock signature" lights up in
+  1980 (OPEC II, hottest = Transportation) and 2021–22 (pandemic), as expected.
+
+## Next lenses (same tab)
+- **Zombie firms** — interest-coverage < 1 for ≥3y from SEC EDGAR (needs a
+  User-Agent'd fetch path; EDGAR returns 403 without one in this environment).
+- **Value subtraction** — value-added per hour going backwards, from BLS/BEA.
 
 ## Summary
 Higher- vs lower-productivity jobs, firms, and sectors is uncontroversial. This
