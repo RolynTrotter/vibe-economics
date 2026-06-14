@@ -54,3 +54,27 @@ sell, leaving you exposed to a single employer stock.
   any gap is weighting, not skew. SPY carries a ~0.09%/yr expense drag.
 - Dec→Dec calendar-year returns stand in for a representative one-year hold (a real
   ESPP window starts whenever you buy).
+
+## Update — ESPP Analyzer (parameterised dashboard)
+
+Added a second service/tab, **ESPP Analyzer** (`backend/app/services/espp_analyzer/`
++ `frontend/src/services/EsppAnalyzer.jsx`), for evaluating a *specific* plan rather
+than the generic one-year case. It models full ESPP mechanics on a monthly
+total-return panel (`sp500_monthly_levels`):
+
+- **Parameters:** contribution term (3/6/12 mo), holding period after purchase
+  (0/6/12/18/24 mo), lookback (on/off), discount (0–30%).
+- **Average invested dollar:** contributions are spread over the term, so the
+  average dollar is idle cash for `term/2` months, then buys discounted stock and is
+  held `hold` months → committed `term/2 + hold` months, which is what APY annualises.
+- **Lookback:** purchase price = `(1 − d) × min(start_level, purchase_level)` — captures
+  both downside protection and start-price appreciation.
+- **Output:** APY *spread* vs the index (ESPP APY − index APY over the same committed
+  window) at the **25th / median / 75th** percentile of every (stock, start-month)
+  window, plus P(beat index) and P(loss).
+
+**What it shows:** a "garbage" plan (5%, no lookback, 12-mo term, 12-mo hold) has a
+median APY spread of only ~+1.4%, beats the index just ~53% of the time, and loses
+money ~24% of the time — barely better than a coin flip. **The lookback is a bigger
+lever than the discount size** (5% + lookback ≫ 5% no-lookback). Short commits with a
+discount annualise to very large APYs (a real one-off edge, not a repeatable rate).

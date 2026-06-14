@@ -56,6 +56,7 @@ from app.core.catalog import get_dataset
 from app.core.datasets import load_processed
 
 DATASET_ID = "sp500_constituent_returns"
+MONTHLY_DATASET_ID = "sp500_monthly_levels"
 INDEX_TICKER = "SPY"  # SPY adjusted close = total-return S&P 500 (see module docstring)
 
 _CONSTITUENTS_URL = (
@@ -206,16 +207,57 @@ def compile_dataset(raw_dir: str | Path) -> pd.DataFrame:
     return out
 
 
-def build() -> None:
-    """End-to-end: acquire raw, compile, write processed parquet."""
-    acquire()
-    entry = get_dataset(DATASET_ID)
-    df = compile_dataset(entry.raw_path)
+def _monthly_levels(prices: pd.DataFrame, kind: str) -> pd.DataFrame:
+    """One total-return level per ticker-month (last observation in the month).
+
+    `mkey` is a dense calendar month index (year*12 + month-1) so a hold of N
+    months is exactly `mkey + N` — gaps in a ticker's history are skipped rather
+    than mis-aligned. `level` is the split+dividend-adjusted close (total return).
+    """
+    px = prices.copy()
+    px["date"] = pd.to_datetime(px["date"])
+    px["year"] = px["date"].dt.year
+    px["month"] = px["date"].dt.month
+    px = px.sort_values(["ticker", "date"])
+    last = px.groupby(["ticker", "year", "month"], as_index=False).last()
+    last["mkey"] = last["year"] * 12 + (last["month"] - 1)
+    last["kind"] = kind
+    out = last[["ticker", "mkey", "year", "month", "adjclose", "kind"]]
+    return out.rename(columns={"adjclose": "level"})
+
+
+def compile_monthly(raw_dir: str | Path) -> pd.DataFrame:
+    """Compile raw monthly prices -> tidy monthly total-return *levels* (stocks + index).
+
+    Powers the ESPP Analyzer, which needs arbitrary-horizon (term + holding) returns
+    and the lookback min(start, purchase), not just calendar-year returns.
+    Schema: ticker | mkey | year | month | level | kind (stock | index).
+    """
+    raw_dir = Path(raw_dir)
+    stock_px = pd.read_parquet(raw_dir / "monthly_prices.parquet")
+    index_px = pd.read_parquet(raw_dir / "index_prices.parquet")
+    stock = _monthly_levels(stock_px, "stock")
+    index = _monthly_levels(index_px, "index")
+    out = pd.concat([stock, index], ignore_index=True)
+    out = out.sort_values(["kind", "ticker", "mkey"]).reset_index(drop=True)
+    out["level"] = out["level"].astype(float)
+    return out
+
+
+def _write_processed(ds_id: str, df: pd.DataFrame) -> None:
+    entry = get_dataset(ds_id)
     out = entry.processed_path
     out.parent.mkdir(parents=True, exist_ok=True)
     df.to_parquet(out, index=False)
-    n_stock = int((df["kind"] == "stock").sum())
-    print(f"Compiled {DATASET_ID}: {len(df)} rows ({n_stock} stock-years) -> {out}")
+    print(f"Compiled {ds_id}: {len(df)} rows -> {out}")
+
+
+def build() -> None:
+    """End-to-end: acquire raw, compile both the annual panel and the monthly levels."""
+    acquire()
+    raw_dir = get_dataset(DATASET_ID).raw_path
+    _write_processed(DATASET_ID, compile_dataset(raw_dir))
+    _write_processed(MONTHLY_DATASET_ID, compile_monthly(raw_dir))
 
 
 # --------------------------------------------------------------------------- #
@@ -226,15 +268,18 @@ def load_panel() -> pd.DataFrame:
     return load_processed(DATASET_ID)
 
 
+def load_monthly() -> pd.DataFrame:
+    """Load the compiled monthly total-return levels (cached). Powers the ESPP Analyzer."""
+    return load_processed(MONTHLY_DATASET_ID)
+
+
 if __name__ == "__main__":
     cmd = sys.argv[1] if len(sys.argv) > 1 else "build"
+    raw_dir = get_dataset(DATASET_ID).raw_path
     if cmd == "acquire":
         acquire()
     elif cmd == "compile":
-        entry = get_dataset(DATASET_ID)
-        df = compile_dataset(entry.raw_path)
-        entry.processed_path.parent.mkdir(parents=True, exist_ok=True)
-        df.to_parquet(entry.processed_path, index=False)
-        print(f"Compiled {len(df)} rows -> {entry.processed_path}")
+        _write_processed(DATASET_ID, compile_dataset(raw_dir))
+        _write_processed(MONTHLY_DATASET_ID, compile_monthly(raw_dir))
     else:
         build()

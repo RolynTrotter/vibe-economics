@@ -430,9 +430,89 @@ def export_espp_median_stock() -> None:
           f"-> {out.relative_to(ROOT)} ({size_kb:.0f} KB)")
 
 
+def export_espp_analyzer() -> None:
+    """Snapshot for the ESPP Analyzer: the full (term, hold, lookback, discount) grid
+    of APY-spread / ESPP-APY / index-APY percentiles, so the widget reads the cell
+    for its four controls with no client-side recompute."""
+    import sys
+
+    sys.path.insert(0, str(ROOT / "backend"))
+    from app.services.espp_median_stock.data import load_monthly
+    from app.services.espp_analyzer import model as ea
+
+    monthly = load_monthly()
+    cells = ea.grid(monthly)
+    stocks = monthly[monthly["kind"] == "stock"]
+
+    def _r3(d):
+        return {k: round(v, 4) for k, v in d.items()}
+
+    compact = {
+        key: {
+            "spread": _r3(c["spread_apy"]),
+            "espp": _r3(c["espp_apy"]),
+            "index": _r3(c["index_apy"]),
+            "beat": round(c["prob_beat_index"], 4),
+            "loss": round(c["prob_loss"], 4),
+            "n": c["n_samples"],
+            "years": c["years_committed"],
+            "head_start": round(c["espp_head_start"], 4),
+        }
+        for key, c in cells.items()
+    }
+
+    payload = {
+        "dataset": "sp500_monthly_levels",
+        "source": (
+            "Yahoo Finance monthly adjusted close (split + dividend adjusted = total "
+            "return); index = SPY. Universe = current S&P 500 members."
+        ),
+        "definition": (
+            "APY on the AVERAGE invested dollar (contributed evenly over the term, so "
+            "committed term/2 + hold months), ESPP vs index, at the 25th/50th/75th "
+            "percentile of every (stock, start-month) window. ESPP buys at "
+            "(1 − discount) × (min(start, purchase) if lookback else purchase)."
+        ),
+        "term_options": ea.TERM_OPTIONS,
+        "hold_options": ea.HOLD_OPTIONS,
+        "discount_max": 30,
+        "defaults": {
+            "term": ea.DEFAULT_TERM,
+            "hold": ea.DEFAULT_HOLD,
+            "lookback": ea.DEFAULT_LOOKBACK,
+            "discount": int(round(ea.DEFAULT_DISCOUNT * 100)),
+        },
+        "first_year": int(stocks["year"].min()),
+        "last_year": int(stocks["year"].max()),
+        "n_tickers": int(stocks["ticker"].nunique()),
+        "grid": compact,
+        "caveats": [
+            "Survivorship bias: universe = today's S&P 500 members, so spreads are a "
+            "survivor-friendly UPPER bound; the true median is lower and the left tail "
+            "fatter.",
+            "APY annualises the committed horizon, so short commits (e.g. sell at "
+            "purchase) show very large APYs — a real one-off edge stretched to a yearly "
+            "rate. Compare like horizons.",
+            "Windows start every month and overlap, so samples are autocorrelated; "
+            "read the percentiles as a dispersion of outcomes, not independent draws.",
+            "Contributions sit as idle cash until the purchase date (no return); the "
+            "benchmark instead invests the average dollar in the index over the same "
+            "committed window — the honest opportunity cost.",
+            "Lookback uses total-return levels as a proxy for raw price; over 3–12 "
+            "month terms the dividend distortion is small.",
+        ],
+    }
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    out = OUT_DIR / "espp_analyzer.json"
+    out.write_text(json.dumps(payload, separators=(",", ":")))
+    size_kb = out.stat().st_size / 1e3
+    print(f"wrote {len(compact)} grid cells -> {out.relative_to(ROOT)} ({size_kb:.0f} KB)")
+
+
 if __name__ == "__main__":
     export_jst_returns()
     export_subnational_gdp()
     export_negative_productivity()
     export_negative_productivity_zombies()
     export_espp_median_stock()
+    export_espp_analyzer()

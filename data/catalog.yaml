@@ -127,6 +127,27 @@ datasets:
       median stock did worse, making the "median lags the index" finding a
       conservative lower bound.
 
+  sp500_monthly_levels:
+    title: "S&P 500 constituent monthly total-return levels (current members) + SPY"
+    source: "Same raw as sp500_constituent_returns (Yahoo monthly adjusted close + SPY)."
+    homepage: "https://finance.yahoo.com/ ; https://github.com/datasets/s-and-p-500-companies"
+    url: "multi-source — built alongside sp500_constituent_returns (see service data.py)"
+    license: >
+      Derived monthly total-return levels only (not raw Yahoo quotes); personal/
+      non-commercial use. Committed so the ESPP Analyzer runs offline.
+    api_key: null
+    raw: "sp500_constituent_returns/"
+    processed: "sp500_monthly_levels.parquet"
+    compiler: "app.services.espp_median_stock.data:compile_monthly"
+    notes: >
+      Built by the same entrypoint as sp500_constituent_returns:
+      python -m app.services.espp_median_stock.data build. Tidy schema: ticker,
+      mkey (dense calendar month = year*12 + month-1), year, month, level
+      (split+dividend-adjusted close = total-return level), kind (stock | index;
+      index = SPY). Powers the ESPP Analyzer's arbitrary-horizon (contribution
+      term + holding period) returns and the lookback min(start, purchase). Same
+      survivorship caveat as sp500_constituent_returns (current members only).
+
   # --- Catalogued sources for upcoming services (acquire/compile not yet wired) ---
 
   subnational_metros:
