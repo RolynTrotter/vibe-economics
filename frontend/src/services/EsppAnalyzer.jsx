@@ -1,18 +1,42 @@
-// ESPP Analyzer — APY on the *average invested dollar* of an ESPP, vs the index,
-// at the 25th / median / 75th percentile of single-stock outcomes. You set the
-// four knobs of a real plan: contribution term, holding period after purchase,
-// lookback, and discount.
+// ESPP Analyzer — APY *and* raw total return on the average invested dollar of an
+// ESPP, vs the S&P 500, at the 25th / median / 75th percentile of single-stock
+// outcomes. You set the four knobs of a real plan: contribution term, holding
+// period after purchase, lookback, and discount.
 //
 // Deployed app is static, so this reads a committed snapshot
 // (public/data/espp_analyzer.json) that precomputes every (term, hold, lookback,
 // discount) cell with the tested Python model — the widget just looks up its cell.
 import { useEffect, useMemo, useState } from "react";
 import { loadDataset } from "../data.js";
-import MetricCard from "../components/MetricCard.jsx";
 
 const pct = (v) => (v == null ? "—" : `${v >= 0 ? "+" : ""}${(v * 100).toFixed(1)}%`);
 const pct0 = (v) => (v == null ? "—" : `${(v * 100).toFixed(0)}%`);
 const tone = (v) => (v == null ? undefined : v >= 0.05 ? "good" : v <= 0 ? "bad" : "warn");
+
+// One labelled row of three percentile cards (25th / median / 75th).
+function PctRow({ label, vals, colored }) {
+  const cells = [
+    ["p25", "25th", false],
+    ["median", "median", true],
+    ["p75", "75th", false],
+  ];
+  return (
+    <div>
+      <div className="pctrow-label">{label}</div>
+      <div className="cards cards-3">
+        {cells.map(([k, head, mid]) => {
+          const t = colored ? tone(vals[k]) : undefined;
+          return (
+            <div key={k} className={`card${t ? " " + t : ""}${mid ? " is-median" : ""}`}>
+              <div className="label">{head}</div>
+              <div className="value">{pct(vals[k])}</div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 export default function EsppAnalyzer() {
   const [data, setData] = useState(null);
@@ -50,14 +74,17 @@ export default function EsppAnalyzer() {
     </div>
   );
 
+  const sp = <>S&amp;P 500 <span className="pl-sub">· same window</span></>;
+  const yrs = cell ? cell.years.toFixed(2) : "—";
+
   return (
     <div>
       <div className="panel">
         <div className="footnote" style={{ marginBottom: 10 }}>
-          What APY does an ESPP actually pay on the <b>average dollar</b> you put in —
+          What does an ESPP actually pay on the <b>average dollar</b> you put in —
           and how does that compare to just buying the index? Dollars sit idle as cash
           until the purchase date, then ride a single stock. Set your plan's terms; the
-          range below is the 25th–75th percentile of outcomes across S&P 500 stocks.
+          ranges below are the 25th–75th percentile across S&P 500 stocks.
         </div>
 
         <label className="field" style={{ gap: 6 }}>
@@ -97,52 +124,29 @@ export default function EsppAnalyzer() {
       {cell && (
         <>
           <div className="panel">
-            <div className="chart-title">
-              APY spread vs the index — average invested dollar
+            <div className="chart-title">Annualised return (APY) — average invested dollar</div>
+            <div className="footnote" style={{ margin: "4px 0 2px" }}>
+              Capital committed ≈ <b>{yrs} yr</b> (term/2 + hold). ESPP beats the index
+              in <b>{pct0(cell.beat)}</b> of cases; the average dollar ends at a loss{" "}
+              <b>{pct0(cell.loss)}</b> of the time.
             </div>
-            <div className="footnote" style={{ margin: "4px 0 12px" }}>
-              Capital committed ≈ <b>{cell.years.toFixed(2)} yr</b> (term/2 + hold).
-              ESPP beats the index in <b>{pct0(cell.beat)}</b> of cases; the average
-              dollar ends at a loss <b>{pct0(cell.loss)}</b> of the time.
-            </div>
-            <div className="cards">
-              <MetricCard label="25th percentile" value={pct(cell.spread.p25)}
-                sub="unlucky stock" tone={tone(cell.spread.p25)} />
-              <MetricCard label="Median stock" value={pct(cell.spread.median)}
-                sub="typical outcome" tone={tone(cell.spread.median)} />
-              <MetricCard label="75th percentile" value={pct(cell.spread.p75)}
-                sub="lucky stock" tone={tone(cell.spread.p75)} />
-            </div>
+            <PctRow label="Spread (ESPP − S&P)" vals={cell.spread} colored />
+            <PctRow label="ESPP on your cash" vals={cell.espp} />
+            <PctRow label={sp} vals={cell.index} />
           </div>
 
           <div className="panel">
-            <div className="chart-title">Underlying APY (median across stocks)</div>
-            <table className="apy-table">
-              <thead>
-                <tr><th></th><th>25th</th><th>median</th><th>75th</th></tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td>ESPP on your cash</td>
-                  <td>{pct(cell.espp.p25)}</td><td><b>{pct(cell.espp.median)}</b></td><td>{pct(cell.espp.p75)}</td>
-                </tr>
-                <tr>
-                  <td>Index, same window</td>
-                  <td>{pct(cell.index.p25)}</td><td>{pct(cell.index.median)}</td><td>{pct(cell.index.p75)}</td>
-                </tr>
-                <tr className="apy-spread">
-                  <td>Spread (ESPP − index)</td>
-                  <td>{pct(cell.spread.p25)}</td><td><b>{pct(cell.spread.median)}</b></td><td>{pct(cell.spread.p75)}</td>
-                </tr>
-              </tbody>
-            </table>
-            <div className="footnote" style={{ marginTop: 8 }}>
+            <div className="chart-title">Total return over the {yrs}-yr commit (raw, not annualised)</div>
+            <PctRow label="Spread (ESPP − S&P)" vals={cell.spread_raw} colored />
+            <PctRow label="ESPP on your cash" vals={cell.espp_raw} />
+            <PctRow label={sp} vals={cell.index_raw} />
+            <div className="footnote" style={{ marginTop: 10 }}>
               The {discount}% discount is a one-time head start of {pct(cell.head_start)} on
               your cash. {lookback
-                ? "The lookback also lets you buy at the lower of the start and purchase prices — usually the bigger lever than the discount itself."
+                ? "The lookback also lets you buy at the lower of the start and purchase prices — usually a bigger lever than the discount itself."
                 : "With no lookback you only get the flat discount off the purchase-date price."}{" "}
               {hold === 0
-                ? "Selling at purchase annualises a one-off edge into a very large APY — real, but it's a single flip, not a repeatable yearly rate."
+                ? "Selling at purchase makes the raw return modest but the APY huge — a one-off edge stretched to a yearly rate."
                 : `Holding ${hold} months exposes you to one stock's swings, which is what widens the 25th–75th range.`}
             </div>
           </div>
