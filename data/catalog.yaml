@@ -143,10 +143,11 @@ datasets:
       Built by the same entrypoint as sp500_constituent_returns:
       python -m app.services.espp_median_stock.data build. Tidy schema: ticker,
       mkey (dense calendar month = year*12 + month-1), year, month, level
-      (split+dividend-adjusted close = total-return level), kind (stock | index;
-      index = SPY). Powers the ESPP Analyzer's arbitrary-horizon (contribution
-      term + holding period) returns and the lookback min(start, purchase). Same
-      survivorship caveat as sp500_constituent_returns (current members only).
+      (split+dividend-adjusted close = total-return level), price (split-adjusted
+      close, no dividend adjustment), kind (stock | index; index = SPY). Powers
+      the ESPP Analyzer's arbitrary-horizon (contribution term + holding period)
+      returns (level) and the lookback min(start, purchase) on actual share price.
+      Same survivorship caveat as sp500_constituent_returns (current members only).
 
   # --- Catalogued sources for upcoming services (acquire/compile not yet wired) ---
 

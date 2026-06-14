@@ -11,18 +11,23 @@ import pandas as pd
 from app.services.espp_analyzer import model
 
 
-def _panel(stock_levels: dict[str, dict[int, float]], index_levels: dict[int, float]):
-    """Build a monthly-levels panel from {ticker: {mkey: level}} + {mkey: index level}."""
+def _panel(stock_levels, index_levels, stock_prices=None):
+    """Build a monthly panel from {ticker: {mkey: level}} + {mkey: index level}.
+
+    `stock_prices` (same shape) sets the split-adjusted *price* used by the
+    lookback; when omitted, price = level (no dividend wedge).
+    """
     rows = []
     for tk, lv in stock_levels.items():
+        prices = (stock_prices or {}).get(tk, lv)
         for mkey, level in lv.items():
             y, mo = divmod(mkey, 12)
             rows.append({"ticker": tk, "mkey": mkey, "year": y, "month": mo + 1,
-                         "level": float(level), "kind": "stock"})
+                         "level": float(level), "price": float(prices[mkey]), "kind": "stock"})
     for mkey, level in index_levels.items():
         y, mo = divmod(mkey, 12)
         rows.append({"ticker": "SPY", "mkey": mkey, "year": y, "month": mo + 1,
-                     "level": float(level), "kind": "index"})
+                     "level": float(level), "price": float(level), "kind": "index"})
     return pd.DataFrame(rows)
 
 
@@ -65,6 +70,24 @@ def test_lookback_captures_appreciation():
     assert lb["espp_apy"]["median"] == pytest.approx((125 / 90) ** (1 / years) - 1, rel=1e-9)
     assert no_lb["espp_apy"]["median"] == pytest.approx((1 / 0.9) ** (1 / years) - 1, rel=1e-9)
     assert lb["espp_apy"]["median"] > no_lb["espp_apy"]["median"]
+
+
+def test_lookback_uses_price_not_total_return():
+    # Price rises 100 -> 110 over the term (10% price appreciation), but the
+    # total-return level rises 100 -> 120 (extra 10 from dividends). Flat through
+    # the hold. The lookback edge must follow PRICE (110/100), not the TR level
+    # (120/100): gross = (level_sale/level_purchase) * (P_purchase/min(P_start,P_purchase))
+    #                  = (120/120) * (110/100) = 1.10, then / (1-d).
+    levels = {24000: 100.0, 24006: 120.0, 24012: 120.0}
+    prices = {24000: 100.0, 24006: 110.0, 24012: 110.0}
+    panel = _panel({"AAA": levels}, {24000: 100.0, 24006: 100.0, 24012: 100.0},
+                   stock_prices={"AAA": prices})
+    r = model.analyze(panel, term=6, hold=6, lookback=True, discount=0.10)
+    years = (6 / 2 + 6) / 12
+    assert r["espp_apy"]["median"] == pytest.approx((1.10 / 0.90) ** (1 / years) - 1, rel=1e-9)
+    # The old total-return proxy would have given the higher 1.20/0.90 gross.
+    proxy = (1.20 / 0.90) ** (1 / years) - 1
+    assert r["espp_apy"]["median"] < proxy
 
 
 def test_committed_horizon_scales_apy():

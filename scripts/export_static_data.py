@@ -503,8 +503,10 @@ def export_espp_analyzer() -> None:
             "Contributions sit as idle cash until the purchase date (no return); the "
             "benchmark instead invests the average dollar in the index over the same "
             "committed window — the honest opportunity cost.",
-            "Lookback uses total-return levels as a proxy for raw price; over 3–12 "
-            "month terms the dividend distortion is small.",
+            "The lookback compares actual split-adjusted share PRICES (the holding "
+            "gain still earns the full total return, dividends reinvested), so it is "
+            "not inflated by offering-period dividends. Without a lookback the price "
+            "drops out and the calc is exact.",
         ],
     }
     OUT_DIR.mkdir(parents=True, exist_ok=True)
