@@ -57,6 +57,15 @@ body {
   margin-bottom: 16px;
 }
 
+.panel.verdict { border-left: 3px solid var(--accent-2); }
+
+.apy-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+.apy-table th, .apy-table td { padding: 6px 4px; text-align: right; }
+.apy-table th:first-child, .apy-table td:first-child { text-align: left; color: var(--muted); }
+.apy-table thead th { color: var(--muted); font-size: 0.75rem; font-weight: 600; }
+.apy-table tbody tr { border-top: 1px solid #2a3454; }
+.apy-table tr.apy-spread td { color: var(--accent-2); font-weight: 600; }
+
 .controls { display: flex; flex-direction: column; gap: 14px; }
 
 .seg { display: flex; gap: 6px; flex-wrap: wrap; }

@@ -109,3 +109,4 @@ every other service: copy its shape (data loader → model → router → tests 
 | 4 | Fed wealth & income trends | [0004](docs/tickets/0004-fed-wealth-income-trends.md) | #4 | planned |
 | 1 | Currency circulation crossover | [0001](docs/tickets/0001-currency-circulation.md) | #5 | planned |
 | 10 | Negative productivity & value destruction | [0010](docs/tickets/0010-negative-productivity-tracking.md) | — | **built** (localized-inflation + zombie-firm lenses; value-subtraction next) |
+| 11 | ESPP / median-stock analysis | [0011](docs/tickets/0011-espp-median-stock.md) | — | **built** (median S&P 500 stock vs index over a 1-yr hold; ESPP discount evaluation) |
