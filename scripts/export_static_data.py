@@ -331,8 +331,108 @@ def export_negative_productivity_zombies() -> None:
           f"latest zombies -> {out.relative_to(ROOT)} ({size_kb:.0f} KB)")
 
 
+def export_espp_median_stock() -> None:
+    """Snapshot for the ESPP / median-stock widget.
+
+    Ships per-year median-vs-index series + the pooled distribution, plus an ESPP
+    verdict swept over discounts 0–30% in 1% steps so the widget's discount slider
+    reads precomputed (tested) values rather than recomputing client-side.
+    """
+    import sys
+
+    sys.path.insert(0, str(ROOT / "backend"))
+    from app.services.espp_median_stock import data as espp_data
+    from app.services.espp_median_stock import model as espp_model
+
+    panel = espp_data.load_panel()
+    by_year = espp_model.by_year(panel)
+    discounts = [round(0.01 * i, 2) for i in range(0, 31)]
+    curve = espp_model.espp_curve(panel, discounts)
+    default = espp_model.summary(panel)
+
+    def _r(v, n=4):
+        return None if v is None or pd.isna(v) else round(float(v), n)
+
+    payload = {
+        "dataset": "sp500_constituent_returns",
+        "source": (
+            "Yahoo Finance monthly adjusted close (split + dividend adjusted = total "
+            "return); benchmark = SPY (total-return S&P 500). Universe = current S&P "
+            "500 members from the GitHub datasets/s-and-p-500-companies list."
+        ),
+        "definition": (
+            "For each calendar year, the median single-stock one-year total return "
+            "(Dec→Dec, dividends reinvested) among S&P 500 members, vs the index "
+            "(SPY). ESPP return on your cash = (1 + stock_return) / (1 − discount) − 1."
+        ),
+        "first_year": int(by_year["year"].min()),
+        "last_year": int(by_year["year"].max()),
+        "default_discount": espp_model.DEFAULT_DISCOUNT,
+        "verdict": default["verdict"],
+        "by_year": [
+            {
+                "year": int(r.year),
+                "n": int(r.n_stocks),
+                "median_stock": _r(r.median_stock),
+                "mean_stock": _r(r.mean_stock),
+                "index": _r(r.index_return),
+                "p10": _r(r.p10),
+                "p25": _r(r.p25),
+                "p75": _r(r.p75),
+                "p90": _r(r.p90),
+                "pct_beat_index": _r(r.pct_beat_index),
+                "pct_negative": _r(r.pct_negative),
+            }
+            for r in by_year.itertuples()
+        ],
+        # one pooled-distribution snapshot per discount (the slider snaps to 1%)
+        "by_discount": {
+            f"{int(round(d * 100))}": {
+                k: _r(v)
+                for k, v in espp_model.pooled_distribution(panel, discount=d).items()
+                if isinstance(v, (int, float))
+            }
+            for d in discounts
+        },
+        "curve": [
+            {
+                "discount": _r(r.discount, 2),
+                "espp_head_start": _r(r.espp_head_start),
+                "espp_median_return": _r(r.espp_median_return),
+                "espp_pct_beat_index": _r(r.espp_pct_beat_index),
+                "espp_pct_underwater": _r(r.espp_pct_underwater),
+            }
+            for r in curve.itertuples()
+        ],
+        "caveats": [
+            "Survivorship bias: the universe is TODAY'S S&P 500 members, so dropped, "
+            "acquired and bankrupt names are absent and a stock only contributes in "
+            "years it was already public. Survivors skew up, so the true median stock "
+            "did worse and the left tail is fatter — read 'the median roughly matches "
+            "the index over one year' as a survivor-friendly upper bound.",
+            "Single year ≠ lifetime: the classic result that most stocks underperform "
+            "is a long-horizon, compounding-skew phenomenon. Over one year the median "
+            "stock is close to the index; the skew (and the case against holding a "
+            "single stock for many years) grows with the horizon.",
+            "Median vs mean: the cross-sectional median/mean are effectively equal-"
+            "weighted; the index (SPY) is cap-weighted. Part of any gap is weighting, "
+            "not just skew. SPY also carries a ~0.09%/yr expense drag vs the raw index.",
+            "Returns are Dec→Dec calendar-year total returns; a real ESPP's 12-month "
+            "window starts whenever you buy, so treat this as a representative one-year "
+            "hold, not a specific purchase date.",
+        ],
+    }
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    out = OUT_DIR / "espp_median_stock.json"
+    out.write_text(json.dumps(payload, separators=(",", ":")))
+    size_kb = out.stat().st_size / 1e3
+    print(f"wrote {len(payload['by_year'])} years + {len(discounts)} discounts "
+          f"-> {out.relative_to(ROOT)} ({size_kb:.0f} KB)")
+
+
 if __name__ == "__main__":
     export_jst_returns()
     export_subnational_gdp()
     export_negative_productivity()
     export_negative_productivity_zombies()
+    export_espp_median_stock()
