@@ -18,12 +18,16 @@ buys stock and rides it for `hold` months. Its capital is committed for
 `term/2 + hold` months, which is what we annualise over (APY). The discount has
 to earn its keep against (a) that idle-cash drag and (b) just buying the index.
 
-For an offering that starts at month `m`:
-    L_start    = level(m)            # start-of-offering total-return level
-    L_purchase = level(m + term)     # purchase date
-    L_sale     = level(m + term + hold)
-    ref        = min(L_start, L_purchase) if lookback else L_purchase
-    espp_gross = L_sale / ((1 - d) * ref)        # multiple on contributed cash
+For an offering that starts at month `m`, using the actual share `price` (split-
+but not dividend-adjusted) for the lookback and the total-return `level`
+(dividends reinvested) for the holding gain:
+    ref_price  = min(price(m), price(m + term)) if lookback else price(m + term)
+    espp_gross = (1 / (1 - d))
+               * (level(m + term + hold) / level(m + term))   # total return over hold
+               * (price(m + term) / ref_price)                # lookback price edge
+Using price (not total-return levels) for the lookback removes the small upward
+bias from counting offering-period dividends as price appreciation; without a
+lookback the price term is exactly 1, so it matches the total-return calc.
 The benchmark puts the same average dollar in the index over the same committed
 window [m + term/2, m + term + hold]:
     index_gross = index(m + term + hold) / index(m + term/2)
@@ -85,22 +89,33 @@ def _level_at(s: pd.Series, k: float) -> float:
 def window_arrays(monthly: pd.DataFrame, term: int, hold: int, lookback: bool):
     """Per (stock, start-month) base ESPP multiple, index gross, and committed years.
 
-    Returns (base_mult, index_gross, years) where base_mult excludes the discount
-    (apply 1/(1-d) later) so a discount sweep is cheap. years is a scalar.
+    The gross multiple on contributed cash decomposes as
+
+        M = (1/(1-d)) * (adj_sale / adj_purchase) * (P_purchase / ref_price)
+
+    where the holding gain uses the total-return level (`level`, dividends
+    reinvested) and the lookback edge uses the actual share `price` (split- but
+    not dividend-adjusted): ref_price = min(P_start, P_purchase) if lookback else
+    P_purchase. Returns (base_mult, index_gross, years) with base_mult excluding
+    the 1/(1-d) discount (applied later) so a discount sweep is cheap; years is a
+    scalar. Without lookback the price term is exactly 1.
     """
-    stocks = monthly[monthly["kind"] == "stock"][["ticker", "mkey", "level"]]
+    stocks = monthly[monthly["kind"] == "stock"][["ticker", "mkey", "level", "price"]]
     idx = _continuous_index(monthly)
     years = (term / 2.0 + hold) / 12.0
 
-    start = stocks.rename(columns={"level": "L_start"})
-    pur = stocks.rename(columns={"level": "L_purchase"}).copy()
-    pur["mkey"] = pur["mkey"] - term  # so it joins onto start month m
-    sale = stocks.rename(columns={"level": "L_sale"}).copy()
+    start = stocks.rename(columns={"price": "P_start"})[["ticker", "mkey", "P_start"]]
+    pur = stocks.rename(columns={"price": "P_purchase", "level": "adj_purchase"}).copy()
+    pur["mkey"] = pur["mkey"] - term  # join onto offering start month m
+    sale = stocks.rename(columns={"level": "adj_sale"}).copy()
     sale["mkey"] = sale["mkey"] - (term + hold)
 
-    df = start.merge(pur[["ticker", "mkey", "L_purchase"]], on=["ticker", "mkey"])
-    df = df.merge(sale[["ticker", "mkey", "L_sale"]], on=["ticker", "mkey"])
-    df = df[(df["L_start"] > 0) & (df["L_purchase"] > 0) & (df["L_sale"] > 0)]
+    df = start.merge(pur[["ticker", "mkey", "P_purchase", "adj_purchase"]], on=["ticker", "mkey"])
+    df = df.merge(sale[["ticker", "mkey", "adj_sale"]], on=["ticker", "mkey"])
+    df = df[
+        (df["P_start"] > 0) & (df["P_purchase"] > 0)
+        & (df["adj_purchase"] > 0) & (df["adj_sale"] > 0)
+    ]
 
     # index gross over the average dollar's committed window, per unique start month
     starts = np.sort(df["mkey"].unique())
@@ -111,8 +126,12 @@ def window_arrays(monthly: pd.DataFrame, term: int, hold: int, lookback: bool):
     df["index_gross"] = df["mkey"].map(igross)
     df = df[np.isfinite(df["index_gross"]) & (df["index_gross"] > 0)]
 
-    ref = np.minimum(df["L_start"], df["L_purchase"]) if lookback else df["L_purchase"]
-    base_mult = (df["L_sale"] / ref).to_numpy()
+    ref_price = (
+        np.minimum(df["P_start"], df["P_purchase"]) if lookback else df["P_purchase"]
+    )
+    holding = df["adj_sale"] / df["adj_purchase"]      # total return over the hold
+    lookback_edge = df["P_purchase"] / ref_price       # price appreciation captured at entry
+    base_mult = (holding * lookback_edge).to_numpy()
     return base_mult, df["index_gross"].to_numpy(), years
 
 

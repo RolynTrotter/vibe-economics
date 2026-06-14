@@ -31,7 +31,8 @@ def meta() -> dict:
         "definition": "APY on the average invested dollar (committed term/2 + hold "
         "months), ESPP vs index, at p25/median/p75 of (stock, start-month) windows.",
         "caveat": "Survivorship-biased upward (today's members only); windows overlap "
-        "(monthly starts); lookback uses total-return levels as a price proxy.",
+        "(monthly starts); lookback compares actual split-adjusted share prices, "
+        "holding gain earns total return.",
     }
 
 

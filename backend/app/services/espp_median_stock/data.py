@@ -110,13 +110,17 @@ def _fetch_monthly(client: httpx.Client, symbol: str) -> pd.DataFrame | None:
             if not ts:
                 return None
             ind = r.get("indicators", {})
+            close = ind.get("quote", [{}])[0].get("close")  # split-adjusted price
             adj = None
             if "adjclose" in ind and ind["adjclose"]:
                 adj = ind["adjclose"][0].get("adjclose")
             if adj is None:  # TR indices carry no separate adjclose; close already includes divs
-                adj = ind["quote"][0].get("close")
+                adj = close
             dates = pd.to_datetime(pd.Series(ts), unit="s", utc=True).dt.tz_localize(None)
-            out = pd.DataFrame({"date": dates, "adjclose": adj}).dropna()
+            # adjclose = total return (split + dividend adjusted); close = split-adjusted
+            # *price* (no dividend adjustment) — needed for the ESPP lookback, which
+            # compares actual share prices, not total-return levels.
+            out = pd.DataFrame({"date": dates, "adjclose": adj, "close": close}).dropna()
             return out if len(out) else None
         except (httpx.HTTPError, ValueError, KeyError):
             time.sleep(1.0 * (attempt + 1))
@@ -208,13 +212,18 @@ def compile_dataset(raw_dir: str | Path) -> pd.DataFrame:
 
 
 def _monthly_levels(prices: pd.DataFrame, kind: str) -> pd.DataFrame:
-    """One total-return level per ticker-month (last observation in the month).
+    """One observation per ticker-month (last trading point in the month).
 
     `mkey` is a dense calendar month index (year*12 + month-1) so a hold of N
     months is exactly `mkey + N` — gaps in a ticker's history are skipped rather
-    than mis-aligned. `level` is the split+dividend-adjusted close (total return).
+    than mis-aligned. `level` is the split+dividend-adjusted close (total return);
+    `price` is the split-adjusted close (no dividend adjustment) used by the ESPP
+    lookback, which compares actual share prices. Older raw files without `close`
+    fall back to price = level (a small distortion on lookback cases only).
     """
     px = prices.copy()
+    if "close" not in px.columns:
+        px["close"] = px["adjclose"]
     px["date"] = pd.to_datetime(px["date"])
     px["year"] = px["date"].dt.year
     px["month"] = px["date"].dt.month
@@ -222,16 +231,17 @@ def _monthly_levels(prices: pd.DataFrame, kind: str) -> pd.DataFrame:
     last = px.groupby(["ticker", "year", "month"], as_index=False).last()
     last["mkey"] = last["year"] * 12 + (last["month"] - 1)
     last["kind"] = kind
-    out = last[["ticker", "mkey", "year", "month", "adjclose", "kind"]]
-    return out.rename(columns={"adjclose": "level"})
+    out = last[["ticker", "mkey", "year", "month", "adjclose", "close", "kind"]]
+    return out.rename(columns={"adjclose": "level", "close": "price"})
 
 
 def compile_monthly(raw_dir: str | Path) -> pd.DataFrame:
-    """Compile raw monthly prices -> tidy monthly total-return *levels* (stocks + index).
+    """Compile raw monthly prices -> tidy monthly total-return levels + prices (stocks + index).
 
     Powers the ESPP Analyzer, which needs arbitrary-horizon (term + holding) returns
-    and the lookback min(start, purchase), not just calendar-year returns.
-    Schema: ticker | mkey | year | month | level | kind (stock | index).
+    (total-return `level`) and the lookback min(start, purchase) on actual share
+    `price`, not just calendar-year returns.
+    Schema: ticker | mkey | year | month | level | price | kind (stock | index).
     """
     raw_dir = Path(raw_dir)
     stock_px = pd.read_parquet(raw_dir / "monthly_prices.parquet")
@@ -241,6 +251,7 @@ def compile_monthly(raw_dir: str | Path) -> pd.DataFrame:
     out = pd.concat([stock, index], ignore_index=True)
     out = out.sort_values(["kind", "ticker", "mkey"]).reset_index(drop=True)
     out["level"] = out["level"].astype(float)
+    out["price"] = out["price"].astype(float)
     return out
 
 
