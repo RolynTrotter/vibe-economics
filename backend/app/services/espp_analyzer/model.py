@@ -125,19 +125,29 @@ def _pctiles(a: np.ndarray) -> dict:
 
 
 def summarize(base_mult, index_gross, years, discount: float) -> dict:
-    """APY spread / ESPP APY / index APY percentiles for one discount."""
+    """APY + raw (cumulative) return percentiles for ESPP, index, and the spread.
+
+    "Raw" returns are the total return over the committed window (not annualised);
+    APY annualises the same gross multiple over `years`.
+    """
     espp_gross = base_mult / (1.0 - discount)
     espp_apy = espp_gross ** (1.0 / years) - 1.0
     index_apy = index_gross ** (1.0 / years) - 1.0
-    spread = espp_apy - index_apy
+    espp_raw = espp_gross - 1.0
+    index_raw = index_gross - 1.0
     return {
         "n_samples": int(base_mult.size),
         "years_committed": round(float(years), 4),
         "espp_head_start": round(1.0 / (1.0 - discount) - 1.0, 6),
-        "spread_apy": _pctiles(spread),
+        # annualised (APY)
+        "spread_apy": _pctiles(espp_apy - index_apy),
         "espp_apy": _pctiles(espp_apy),
         "index_apy": _pctiles(index_apy),
-        "prob_beat_index": float(np.mean(spread > 0.0)),
+        # raw cumulative return over the committed window
+        "spread_return": _pctiles(espp_raw - index_raw),
+        "espp_return": _pctiles(espp_raw),
+        "index_return": _pctiles(index_raw),
+        "prob_beat_index": float(np.mean(espp_apy > index_apy)),
         "prob_loss": float(np.mean(espp_apy < 0.0)),
     }
 

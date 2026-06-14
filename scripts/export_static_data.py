@@ -449,9 +449,14 @@ def export_espp_analyzer() -> None:
 
     compact = {
         key: {
+            # annualised (APY)
             "spread": _r3(c["spread_apy"]),
             "espp": _r3(c["espp_apy"]),
             "index": _r3(c["index_apy"]),
+            # raw cumulative return over the committed window
+            "spread_raw": _r3(c["spread_return"]),
+            "espp_raw": _r3(c["espp_return"]),
+            "index_raw": _r3(c["index_return"]),
             "beat": round(c["prob_beat_index"], 4),
             "loss": round(c["prob_loss"], 4),
             "n": c["n_samples"],

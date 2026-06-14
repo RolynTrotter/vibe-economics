@@ -98,6 +98,15 @@ input[type="range"] { width: 100%; height: 44px; accent-color: var(--accent); }
 .card.warn .value { color: var(--accent-2); }
 .card.bad .value { color: var(--danger); }
 
+/* Compact 3-up percentile blocks (25th / median / 75th line up in one row). */
+.cards-3 { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.cards-3 .card { padding: 10px 8px; text-align: center; }
+.cards-3 .card .label { font-size: 0.68rem; }
+.cards-3 .card .value { font-size: 1.12rem; margin-top: 2px; }
+.cards-3 .card.is-median { outline: 1px solid #2f3c63; }
+.pctrow-label { font-size: 0.82rem; color: var(--text); font-weight: 600; margin: 12px 0 5px; }
+.pctrow-label .pl-sub { color: var(--muted); font-weight: 400; font-size: 0.78rem; }
+
 .chart-wrap { width: 100%; }
 .chart-title { font-size: 0.9rem; color: var(--muted); margin: 4px 0 8px; }
 
